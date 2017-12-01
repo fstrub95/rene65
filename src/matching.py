@@ -13,7 +13,7 @@ from sample import Sample
 import re
 
 
-
+print Hi
 
 INDEX_SEGMENTATION=8
 
