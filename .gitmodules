@@ -1,0 +1,3 @@
+[submodule "pymicro"]
+	path = pymicro
+	url = https://github.com/heprom/pymicro
