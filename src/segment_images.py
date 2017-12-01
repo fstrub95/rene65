@@ -1,8 +1,10 @@
 import argparse
 import multiprocessing
 import os
-
+import logging
 import numpy as np
+import cv2
+import math
 
 from segmentation.evaluation import Evaluator
 from segmentation.processing import LabyProcessing
@@ -24,15 +26,26 @@ from sample import Sample
 
 def process_and_evaluate(data):
 
-    sample_filename = data["filename"]
+    filename_in = data["filename_in"]
+    filename_out = data["filename_out"]
     evaluator = data["evaluator"]
     processor = data["processor"]
 
-    sample = Sample(sample_filename)
+    logger = logging.getLogger()
+    logger.info("Processing file: {}".format(filename_in))
 
+    # Load image
+    sample = Sample(filename_in, crop_bottom=0.10)
+
+    # Compute segmentation
     final_img = processor.process(img=sample.get_image())
 
+    # Compute error
     s, _ = evaluator.evaluate(final_img)
+
+    # dump segmentation
+    logger.info("Dumping file: {} - MAE: {}".format(filename_out, math.fabs(s)))
+    cv2.imwrite(filename_out, final_img)
 
     return s
 
@@ -69,7 +82,8 @@ if __name__ == "__main__":
         if sample_filename.endswith(args.img_ext):
 
             d = {
-                "filename" : os.path.join(args.img_dir,sample_filename),
+                "filename_in" : os.path.join(args.img_dir,sample_filename),
+                "filename_out": os.path.join(args.seg_dir, sample_filename),
                 "evaluator" : evaluator,
                 "processor" : processor
             }
