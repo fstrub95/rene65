@@ -13,8 +13,6 @@ from sample import Sample
 import re
 
 
-print Hi
-
 INDEX_SEGMENTATION=8
 
 def extract_headers(ang_file):
