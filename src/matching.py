@@ -66,13 +66,16 @@ def parse_and_match(data):
     crop = cv2.resize(crop, (nrows , ncols), interpolation=cv2.INTER_NEAREST)
     crop = crop.reshape(-1)
 
-    crop[np.where(crop >  255 / 2)] = 255
-    crop[np.where(crop <= 255 / 2)] = 0
+    # Compute the phase
+    phase = np.copy(crop)
+    phase[np.where(crop >  255 / 2)] = 1
+    phase[np.where(crop <= 255 / 2)] = 0
 
-    ang.iloc[:, INDEX_SEGMENTATION] = crop
+    ang.iloc[:, INDEX_SEGMENTATION] = phase
 
     # dump new ang
     logger.info("Dumping file: {}".format(ang_out))
+    header = header.replace("Phase 1", "Phase 2")
     with open(ang_out, 'w') as fobj:
         fobj.write(header)
         ang.to_csv(fobj, sep='\t', encoding='utf-8', header=False)
