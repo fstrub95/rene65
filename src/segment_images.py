@@ -100,14 +100,3 @@ if __name__ == "__main__":
     logger.info("RMSE : {}".format(error))
 
 
-
-
-# Legacy code
-# processor = MiLAProcessing(
-#     gauss_kernel=random.choice([3,5]),
-#     gauss_std=max(0.1, random.gauss(1, sigma=0.5)),
-#     threshold_up = random.randint(130,220),
-#     threshold_bottom = random.randint(20, 130),
-#     self_kernel = random.randint(2,6),
-#     use_erode= (random.randint(0,1) == 0)
-# )

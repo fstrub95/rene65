@@ -22,17 +22,22 @@ tsr_points[5] = [209, 675]
 
 
 
+
+#ugly code!!
+
 num_slices = 325
 
 idslice_2_points = {}
 for id_slice in range(num_slices):
 
-    if id_slice < 20:
+    assert tsr_points.max() < 601, "The tsr_points must be lower than 600 (ang size)"
 
-        slice = {
-            "ref_points": ref_points.tolist(),
-            "tsr_points": tsr_points.tolist(),
-        }
+    slice = {
+        "ref_points": ref_points.tolist(),
+        "tsr_points": (tsr_points * 601.0 / 1024).astype(np.int).tolist(),
+    }
+
+
 
     idslice_2_points[id_slice] = slice
 

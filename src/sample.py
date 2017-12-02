@@ -1,4 +1,4 @@
-#import cv2
+import cv2
 
 class Sample(object):
     def __init__(self, filename, crop_bottom=0):

@@ -157,10 +157,13 @@ class OimScan:
 			# write body
 			if self.sem is not None and self.fit is not None:
 				stackedData = numpy.stack((self.euler[:,:,0], self.euler[:,:,1], self.euler[:,:,2], self.x, self.y, self.iq, self.ci, self.phase, self.sem, self.fit))
+				stackedData = numpy.transpose(stackedData, axes=[1, 2, 0])
 			elif self.sem is not None:
 				stackedData = numpy.stack((self.euler[:,:,0], self.euler[:,:,1], self.euler[:,:,2], self.x, self.y, self.iq, self.ci, self.phase, self.sem))
+				stackedData = numpy.transpose(stackedData, axes=[1, 2, 0])
 			elif self.fit is not None:
 				stackedData = numpy.stack((self.euler[:,:,0], self.euler[:,:,1], self.euler[:,:,2], self.x, self.y, self.iq, self.ci, self.phase, self.fit))
+				stackedData = numpy.transpose(stackedData, axes=[1,2,0])
 			else:
 				print('iq', self.iq.shape)
 				print('phase', self.phase.shape)
