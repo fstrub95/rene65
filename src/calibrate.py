@@ -109,17 +109,32 @@ def parse_and_match(data):
     compositeScan.phaseList = [phase1, phase2]
 
     # Crop big .ang file
-    x = compositeScan.iq
-    sum_cols = np.sum(x,axis=0)
-    sum_rows = np.sum(x,axis=1)
-    in_rows = np.nonzero(sum_rows)
-    in_cols = np.nonzero(sum_cols)
-    min_row = np.min(in_rows)
-    max_row = np.max(in_rows)
-    min_col = np.min(in_cols)
-    max_col = np.max(in_cols)
-    # ecrire le crop qui va de [min_row:max_row,min_col:max_col]
-    # compositeScan = compositeScan[min_row:max_row, min_col:max_col] // J'ai tente ca mais visiblement il est pas content, compositeScan c'est une instance et on croppe pas une instance a priori huhu
+    # Calculate coordinates of the estimated crop
+    # x = compositeScan.iq
+    # sum_cols = np.sum(x,axis=0)
+    # sum_rows = np.sum(x,axis=1)
+    # in_rows = np.nonzero(sum_rows)
+    # in_cols = np.nonzero(sum_cols)
+    # min_row = np.min(in_rows)
+    # max_row = np.max(in_rows)
+    # min_col = np.min(in_cols)
+    # max_col = np.max(in_cols)
+    min_row = 0
+    max_row = 1565
+    min_col = 700
+    max_col = 2715
+
+
+    sem = sem[min_row:max_row, min_col:max_col]  # imaged with scaling already applied
+    compositeScan = OimScan.zeros_like(sem, resolution=(pixel_size, pixel_size))
+
+    compositeScan.iq = iq_reg[min_row:max_row, min_col:max_col]
+    compositeScan.ci = ci_reg[min_row:max_row, min_col:max_col]
+    compositeScan.euler[:, :, 0] = eu0_reg[min_row:max_row, min_col:max_col]
+    compositeScan.euler[:, :, 1] = eu1_reg[min_row:max_row, min_col:max_col]
+    compositeScan.euler[:, :, 2] = eu2_reg[min_row:max_row, min_col:max_col]
+
+
 
     fig = plt.figure(figsize=(15, 8))
     plt.imshow(segment, interpolation='nearest', cmap=cm.gray)
