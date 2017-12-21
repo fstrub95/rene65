@@ -1,3 +1,32 @@
+# # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
+#                                                                                 #
+# Copyright (c) 2017 Marie-Agathe Charpagne & Florian Strub                       #
+# All rights reserved.                                                            #
+#                                                                                 #
+# Redistribution and use in source and binary forms, with or without              #
+# modification, are permitted provided that the following conditions are met:     #
+#     * Redistributions of source code must retain the above copyright            #
+#       notice, this list of conditions and the following disclaimer.             #
+#     * Redistributions in binary form must reproduce the above copyright         #
+#       notice, this list of conditions and the following disclaimer in the       #
+#       documentation and/or other materials provided with the distribution.      #
+#     * Neither the name of the <organization> nor the                            #
+#       names of its contributors may be used to endorse or promote products      #
+#       derived from this software without specific prior written permission.     #
+#                                                                                 #
+# THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND #
+# ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED   #
+# WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE          #
+# DISCLAIMED. IN NO EVENT SHALL <COPYRIGHT HOLDER> BE LIABLE FOR ANY              #
+# DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES      #
+# (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;    #
+# LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND     #
+# ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT      #
+# (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS   #
+# SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.                    #
+#                                                                                 #
+# # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
+
 import argparse
 import multiprocessing
 import os
@@ -5,17 +34,17 @@ import logging
 import numpy as np
 from scipy import ndimage
 import json
-from misc.logger import create_logger
+from src.misc.logger import create_logger
 from crystallography.tsl import OimScan
 from pymicro.view.vol_utils import compute_affine_transform
 import re
 from pymicro.external.tifffile import TiffFile
-from sample import Sample
+from src.sample import Sample
 import copy
 
 from matplotlib import pyplot as plt, cm
 
-# markers in Slice70.tif
+
 
 def parse_and_match(data):
 
@@ -67,7 +96,7 @@ def parse_and_match(data):
     sample = Sample(seg_in)
     segment = sample.get_image()
     phase = np.copy(sample.get_image())
-    phase[np.where(segment >  255 / 2)] = 1
+    phase[np.where(segment > 255 / 2)] = 1
     phase[np.where(segment <= 255 / 2)] = 2
     compositeScan.phase = phase
 
@@ -75,10 +104,22 @@ def parse_and_match(data):
     phase1 = scan.phaseList[0]
     phase2 = copy.copy(scan.phaseList[0])
     phase2.number = 2
-    phase2.formula = 'Pr'
-    phase2.materialName = 'Precipitate'
+    phase2.formula = 'Ma'
+    phase2.materialName = 'Matrix'
     compositeScan.phaseList = [phase1, phase2]
 
+    # Crop big .ang file
+    x = compositeScan.iq
+    sum_cols = np.sum(x,axis=0)
+    sum_rows = np.sum(x,axis=1)
+    in_rows = np.nonzero(sum_rows)
+    in_cols = np.nonzero(sum_cols)
+    min_row = np.min(in_rows)
+    max_row = np.max(in_rows)
+    min_col = np.min(in_cols)
+    max_col = np.max(in_cols)
+    # ecrire le crop qui va de [min_row:max_row,min_col:max_col]
+    # compositeScan = compositeScan[min_row:max_row, min_col:max_col] // J'ai tente ca mais visiblement il est pas content, compositeScan c'est une instance et on croppe pas une instance a priori huhu
 
     fig = plt.figure(figsize=(15, 8))
     plt.imshow(segment, interpolation='nearest', cmap=cm.gray)
@@ -100,7 +141,7 @@ if __name__ == "__main__":
     parser.add_argument("-ang_dir", type=str, required=True, help="Directory with ang info")
     parser.add_argument("-iq_out_dir", type=str, required=True, help="Directory to output iq image")
     parser.add_argument("-ang_out_dir", type=str, required=True, help="Directory to output updated ang info")
-    parser.add_argument("-no_thread", type=int, default=2, help="Number of thread to run execute the segmentation")
+    parser.add_argument("-no_thread", type=int, default=1, help="Number of thread to run execute the segmentation")
     parser.add_argument("-calibration", type=str, required=True, help="Path to the file containing the list of points")
 
     args = parser.parse_args()
