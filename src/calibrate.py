@@ -34,12 +34,12 @@ import logging
 import numpy as np
 from scipy import ndimage
 import json
-from src.misc.logger import create_logger
+from misc.logger import create_logger
 from crystallography.tsl import OimScan
 from pymicro.view.vol_utils import compute_affine_transform
 import re
 from pymicro.external.tifffile import TiffFile
-from src.sample import Sample
+from sample import Sample
 import copy
 
 from matplotlib import pyplot as plt, cm
@@ -73,8 +73,6 @@ def parse_and_match(data):
     offset = -np.dot(invt, translation)
 
     sem = TiffFile(seg_in).asarray()[:2048, :].T  # imaged with scaling already applied
-    compositeScan = OimScan.zeros_like(sem.T, resolution=(pixel_size, pixel_size))
-    compositeScan.sampleId = 'R65_09_13_17_{}'.format(str(slice_id).zfill(3))
 
 
     # Register new ebsd with transformation
@@ -84,29 +82,6 @@ def parse_and_match(data):
     eu2_reg = ndimage.interpolation.affine_transform(scan.euler[:,:, 2].T, invt, output_shape=sem.shape, offset=offset, order=0).T
     ci_reg = ndimage.interpolation.affine_transform(scan.ci.T, invt, output_shape=sem.shape, offset=offset, order=0, cval=-1).T
 
-    compositeScan.euler[:, :, 0] = eu0_reg
-    compositeScan.euler[:, :, 1] = eu1_reg
-    compositeScan.euler[:, :, 2] = eu2_reg
-    compositeScan.ci = ci_reg
-    compositeScan.iq = iq_reg
-    compositeScan.sem = np.ones_like(ci_reg) #bug in tsl.py that prevent using this features
-
-
-    # Create phase
-    sample = Sample(seg_in)
-    segment = sample.get_image()
-    phase = np.copy(sample.get_image())
-    phase[np.where(segment > 255 / 2)] = 1
-    phase[np.where(segment <= 255 / 2)] = 2
-    compositeScan.phase = phase
-
-    # Match precipitate segmentation and EBSD
-    phase1 = scan.phaseList[0]
-    phase2 = copy.copy(scan.phaseList[0])
-    phase2.number = 2
-    phase2.formula = 'Ma'
-    phase2.materialName = 'Matrix'
-    compositeScan.phaseList = [phase1, phase2]
 
     # Crop big .ang file
     # Calculate coordinates of the estimated crop
@@ -125,14 +100,32 @@ def parse_and_match(data):
     max_col = 2715
 
 
-    sem = sem[min_row:max_row, min_col:max_col]  # imaged with scaling already applied
+    sem = sem.T[min_row:max_row, min_col:max_col]  # imaged with scaling already applied
     compositeScan = OimScan.zeros_like(sem, resolution=(pixel_size, pixel_size))
+    compositeScan.sampleId = 'R65_09_13_17_{}'.format(str(slice_id).zfill(3))
 
-    compositeScan.iq = iq_reg[min_row:max_row, min_col:max_col]
-    compositeScan.ci = ci_reg[min_row:max_row, min_col:max_col]
     compositeScan.euler[:, :, 0] = eu0_reg[min_row:max_row, min_col:max_col]
     compositeScan.euler[:, :, 1] = eu1_reg[min_row:max_row, min_col:max_col]
     compositeScan.euler[:, :, 2] = eu2_reg[min_row:max_row, min_col:max_col]
+    compositeScan.iq = iq_reg[min_row:max_row, min_col:max_col]
+    compositeScan.ci = ci_reg[min_row:max_row, min_col:max_col]
+    compositeScan.sem = np.ones_like(ci_reg) #bug in tsl.py that prevent using this features
+
+    # Create phase
+    sample = Sample(seg_in)
+    segment = sample.get_image()[min_row:max_row, min_col:max_col]
+    phase = np.copy(sample.get_image())
+    phase[np.where(segment > 255 / 2)] = 1
+    phase[np.where(segment <= 255 / 2)] = 2
+    compositeScan.phase = phase
+
+    # Match precipitate segmentation and EBSD
+    phase1 = scan.phaseList[0]
+    phase2 = copy.copy(scan.phaseList[0])
+    phase2.number = 2
+    phase2.formula = 'Ma'
+    phase2.materialName = 'Matrix'
+    compositeScan.phaseList = [phase1, phase2]
 
 
 
