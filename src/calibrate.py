@@ -109,12 +109,12 @@ def parse_and_match(data):
     compositeScan.euler[:, :, 2] = eu2_reg[min_row:max_row, min_col:max_col]
     compositeScan.iq = iq_reg[min_row:max_row, min_col:max_col]
     compositeScan.ci = ci_reg[min_row:max_row, min_col:max_col]
-    compositeScan.sem = np.ones_like(ci_reg) #bug in tsl.py that prevent using this features
+    compositeScan.sem = np.ones_like(ci_reg[min_row:max_row, min_col:max_col])
 
     # Create phase
     sample = Sample(seg_in)
     segment = sample.get_image()[min_row:max_row, min_col:max_col]
-    phase = np.copy(sample.get_image())
+    phase = np.copy(sample.get_image())[min_row:max_row, min_col:max_col]
     phase[np.where(segment > 255 / 2)] = 1
     phase[np.where(segment <= 255 / 2)] = 2
     compositeScan.phase = phase
