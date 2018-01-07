@@ -48,9 +48,9 @@ for _ in range(1,100000):
 
     # TODO: add your coefficients here!
     k1 = random.choice([-1, 1])*10**(-random.uniform(2,7))  # negative to remove barrel distortion
-    k2 = random.choice([-1, 1])*10**(-random.uniform(2,7))  # negative to remove barrel distortion
+    k2 = random.choice([-1, 1])*10**(-random.uniform(2,8))  # negative to remove barrel distortion
     p1 = random.choice([-1, 1])*10**(-random.uniform(2,7))
-    p2 = random.choice([-1, 1])*10**(-random.uniform(2,7))
+    p2 = random.choice([-1, 1])*10**(-random.uniform(2,8))
 
     distCoeff[0, 0] = k1
     distCoeff[1, 0] = k2
@@ -67,13 +67,13 @@ for _ in range(1,100000):
     cam[1, 1] = focal  # define focal length y
 
     # here the undistortion will be computed
-    grain = cv2.undistort(grain, cam, distCoeff)
+    grain_distord = cv2.undistort(grain, cam, distCoeff)
 
     try:
         for angle in np.arange(1, 3.0, 0.25):
 
             M = cv2.getRotationMatrix2D((height / 2, width / 2), angle, 1)
-            rot_grain = cv2.warpAffine(grain, M, (height, width))
+            rot_grain = cv2.warpAffine(grain_distord, M, (height, width))
 
             rot_grain[rot_grain < 128] = 0
             rot_grain[rot_grain >= 128] = 255
@@ -89,7 +89,8 @@ for _ in range(1,100000):
 
                     score = (rot_grain == segment_translate).sum()
 
-                    if score < 300:
+                    if score < 450:
+                        print("skip", score)
                         raise ScoreToLow
 
                     if score > max_score:
