@@ -89,8 +89,7 @@ for _ in range(1,100000):
 
                     score = (rot_grain == segment_translate).sum()
 
-                    if score < 450:
-                        print("skip", score)
+                    if score < 350:
                         raise ScoreToLow
 
                     if score > max_score:
