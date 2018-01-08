@@ -41,16 +41,18 @@ best_grain, best_segment = None, None
 
 # Best score sans distorsion 1577 1.75 (-10, 122)
 
+#('---> ', (1686, (-10, 121), 1.75, [0.0001343451017325502, -3.697271222337517e-07, -1.5041346294055493e-06, 3.445295683812902e-07], array([[  17.59044838,    0.        ,  296.37246704],
+#       [   0.        ,   17.59044838,  302.71298218],
 
 for _ in range(1,100000):
 
     distCoeff = np.zeros((4, 1), np.float64)
 
     # TODO: add your coefficients here!
-    k1 = random.choice([-1, 1])*10**(-random.uniform(2,7))  # negative to remove barrel distortion
-    k2 = random.choice([-1, 1])*10**(-random.uniform(2,8))  # negative to remove barrel distortion
-    p1 = random.choice([-1, 1])*10**(-random.uniform(2,7))
-    p2 = random.choice([-1, 1])*10**(-random.uniform(2,8))
+    k1 = random.gauss(5e-5, 2e-6)  # negative to remove barrel distortion
+    k2 = -random.gauss(5e-8, 5e-8)
+    p1 = random.gauss(1e-6, 1e-6)
+    p2 = random.gauss(2e-4, 1e-4)
 
     distCoeff[0, 0] = k1
     distCoeff[1, 0] = k2
@@ -60,9 +62,9 @@ for _ in range(1,100000):
     # assume unit matrix for camera
     cam = np.eye(3, dtype=np.float32)
 
-    focal = random.uniform(1, 20)
-    cam[0, 2] = random.gauss(width / 2.0, 4)  # define center x
-    cam[1, 2] = random.gauss(height / 2.0, 4)  # define center y
+    focal = random.uniform(15, 30)
+    cam[0, 2] = random.gauss(width / 2.0, 30)  # define center x
+    cam[1, 2] = random.gauss(height / 2.0, 30)  # define center y
     cam[0, 0] = focal  # define focal length x
     cam[1, 1] = focal  # define focal length y
 
@@ -70,7 +72,7 @@ for _ in range(1,100000):
     grain_distord = cv2.undistort(grain, cam, distCoeff)
 
     try:
-        for angle in np.arange(1, 3.0, 0.25):
+        for angle in np.arange(0, 4.0, 0.33):
 
             M = cv2.getRotationMatrix2D((height / 2, width / 2), angle, 1)
             rot_grain = cv2.warpAffine(grain_distord, M, (height, width))
@@ -102,7 +104,7 @@ for _ in range(1,100000):
                         fig = plt.figure(figsize=(15, 8))
                         plt.imshow(best_segment, interpolation='nearest', cmap=cm.gray)
                         plt.imshow(best_grain, interpolation='nearest', cmap=cm.jet, alpha=0.5)
-                        fig.savefig("out.png")
+                        fig.savefig("out-{}.png".format(score))
     except ScoreToLow:
         continue
 
@@ -120,6 +122,18 @@ fig.savefig("out.png")
 
 
 
+# ('---> ', (1674, (-11, 121), 1.3200000000000001, [4.832664937699144e-05, -1.2391147016077096e-08, 6.71011746205243e-05, 2.797055575188841e-07],
+# array([[  19.43749428,    0.        ,  300.43862915],
+#        [   0.        ,   19.43749428,  300.11886597],
+#        [   0.        ,    0.        ,    1.        ]], dtype=float32)))
+
+# ('---> ', (1710, (-10, 121), 1.6500000000000001, [-2.0077368897377396e-07, -1.2096681659557517e-08, 0.0002465578925599495, 8.566818843153823e-05],
+# array([[  17.10153389,    0.        ,  315.25561523],
+#        [   0.        ,   17.10153389,  308.22003174],
+#        [   0.        ,    0.        ,    1.        ]], dtype=float32)))
 
 
-
+#('---> ', (1711, (-10, 121), 1.75, [4.775150158382109e-05, -2.295702562245182e-08, -3.81355490560222e-07, 0.0001528079179168962],
+# array([[  16.07833672,    0.        , 298.13970947],
+#       [   0.        ,   16.07833672,  305.46511841],
+#       [   0.        ,    0.        ,    1.        ]], dtype=float32)))
