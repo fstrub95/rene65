@@ -4,7 +4,12 @@ from sample import Sample
 from matplotlib import pyplot as plt, cm
 
 from misc.logger import create_logger
-import random
+import subprocess
+
+import cma
+
+
+
 
 class ScoreToLow(Exception): pass
 
@@ -35,87 +40,153 @@ grain = cv2.bitwise_not(grain)
 
 
 (width, height) = grain.shape
-max_score = 0
+min_score = 0
 best_translation, best_angle = None, None
-best_grain, best_segment = None, None
+
+
+
+
+M = cv2.getRotationMatrix2D((height / 2, width / 2), 1.5, 1)
+rot_grain = cv2.warpAffine(grain, M, (height, width))
+rot_grain[rot_grain < 128] = 1
+rot_grain[rot_grain >= 128] = 255
+cv2.imwrite("../data/tmp/grain.png", rot_grain)
+
+
+M = np.float32([[1, 0, -10], [0, 1, 121]])
+
+
+segment_translate = cv2.warpAffine(segment, M, (height, width))
+segment_translate[segment_translate < 128] = 0
+segment_translate[segment_translate >= 128] = 255
+cv2.imwrite("../data/tmp/segment.png", segment_translate)
+
+
+best_segment = segment_translate
+best_grain = rot_grain
+
+
+
+path = '../data/tmp/'
+
+# Create meshgrid
+
+x = np.array(range(0, 601, 100))
+y = np.array(range(0, 601, 100))
+xv, yv = np.meshgrid(x, y)
+xv = xv.reshape(-1)
+yv = yv.reshape(-1)
+mesh = np.concatenate((xv, yv))
+
+
+
+
+
+min_score = 0
+
+es = cma.CMAEvolutionStrategy(mesh, 3)
+
+while not es.stop():
+    solutions = es.ask()
+
+
+    solutions_int = np.array(solutions, dtype=np.int32)
+
+    scores = []
+    for s in solutions_int:
+        xv_dist = s[:len(xv)]
+        yv_dist = s[len(xv):]
+
+        transformation = np.array([xv, yv, xv_dist, yv_dist]).transpose()
+
+        np.savetxt("{path}/points.txt".format(path=path), transformation, fmt='%i')
+
+        subprocess.run('convert {path}/segment.png -virtual-pixel gray '
+                       '-distort polynomial "3 $(cat {path}/points.txt)" '
+                       '{path}/segment_distord.png'.format(path=path), shell=True)
+
+        segment_distord = Sample("../data/tmp/segment_distord.png").get_image()
+
+        segment_distord[segment_distord < 128] = 0
+        segment_distord[segment_distord >= 128] = 255
+
+        score = -(rot_grain == segment_distord).sum()
+
+        if score < min_score:
+            print(score)
+            min_score = score
+
+        fig = plt.figure(figsize=(15, 8))
+        plt.imshow(Sample("../data/tmp/segment_distord.png").get_image(), interpolation='nearest', cmap=cm.gray)
+        plt.imshow(best_grain, interpolation='nearest', cmap=cm.jet, alpha=0.5)
+        fig.savefig("../data/tmp/out3.png")
+
+        scores.append(score)
+
+    es.tell(solutions, scores)
+    es.disp()
+
+es.result_pretty()
+
+
+
+
 
 # Best score sans distorsion 1577 1.75 (-10, 122)
 
 #('---> ', (1686, (-10, 121), 1.75, [0.0001343451017325502, -3.697271222337517e-07, -1.5041346294055493e-06, 3.445295683812902e-07], array([[  17.59044838,    0.        ,  296.37246704],
 #       [   0.        ,   17.59044838,  302.71298218],
 
-for _ in range(1,100000):
 
-    distCoeff = np.zeros((4, 1), np.float64)
 
-    # TODO: add your coefficients here!
-    k1 = random.gauss(5e-5, 2e-6)  # negative to remove barrel distortion
-    k2 = -random.gauss(5e-8, 5e-8)
-    p1 = random.gauss(1e-6, 1e-6)
-    p2 = random.gauss(2e-4, 1e-4)
+# for angle in np.arange(0, 4.0, 0.33):
+#
+#     M = cv2.getRotationMatrix2D((height / 2, width / 2), angle, 1)
+#     rot_grain = cv2.warpAffine(grain, M, (height, width))
+#
+#     rot_grain[rot_grain < 128] = 0
+#     rot_grain[rot_grain >= 128] = 255
+#
+#     for tx in range(-25, 5, 1):
+#         for ty in range(105, 135, 1):
+#
+#             M = np.float32([[1, 0, tx], [0, 1, ty]])
+#             segment_translate = cv2.warpAffine(segment, M, (height, width))
+#
+#             rot_grain[rot_grain < 128] = 1
+#             rot_grain[rot_grain >= 128] = 255  # put a different background
+#
+#             score = (rot_grain == segment_translate).sum()
+#
+#             if score < 350:
+#                 raise ScoreToLow
+#
+#             if score > max_score:
+#                 max_score = score
+#                 best_grain, best_segment = rot_grain, segment_translate
+#                 best_val = (max_score, (tx, ty), angle)
+#
+#                 logger.info(("---> ", best_val))
+#
+#                 fig = plt.figure(figsize=(15, 8))
+#                 plt.imshow(best_segment, interpolation='nearest', cmap=cm.gray)
+#                 plt.imshow(best_grain, interpolation='nearest', cmap=cm.jet, alpha=0.5)
+#                 fig.savefig("out-{}.png".format(score))
 
-    distCoeff[0, 0] = k1
-    distCoeff[1, 0] = k2
-    distCoeff[2, 0] = p1
-    distCoeff[3, 0] = p2
 
-    # assume unit matrix for camera
-    cam = np.eye(3, dtype=np.float32)
-
-    focal = random.uniform(15, 30)
-    cam[0, 2] = random.gauss(width / 2.0, 30)  # define center x
-    cam[1, 2] = random.gauss(height / 2.0, 30)  # define center y
-    cam[0, 0] = focal  # define focal length x
-    cam[1, 1] = focal  # define focal length y
-
-    # here the undistortion will be computed
-    grain_distord = cv2.undistort(grain, cam, distCoeff)
-
-    try:
-        for angle in np.arange(0, 4.0, 0.33):
-
-            M = cv2.getRotationMatrix2D((height / 2, width / 2), angle, 1)
-            rot_grain = cv2.warpAffine(grain_distord, M, (height, width))
-
-            rot_grain[rot_grain < 128] = 0
-            rot_grain[rot_grain >= 128] = 255
-
-            for tx in range(-25, 5, 1):
-                for ty in range(105, 135, 1):
-
-                    M = np.float32([[1, 0, tx], [0, 1, ty]])
-                    segment_translate = cv2.warpAffine(segment, M, (height, width))
-
-                    rot_grain[rot_grain < 128] = 1
-                    rot_grain[rot_grain >= 128] = 255  # put a different background
-
-                    score = (rot_grain == segment_translate).sum()
-
-                    if score < 350:
-                        raise ScoreToLow
-
-                    if score > max_score:
-                        max_score = score
-                        best_grain, best_segment = rot_grain, segment_translate
-                        best_val = (max_score, (tx, ty), angle, [k1, k2, p1, p2], cam)
-
-                        logger.info(("---> ", best_val))
-
-                        fig = plt.figure(figsize=(15, 8))
-                        plt.imshow(best_segment, interpolation='nearest', cmap=cm.gray)
-                        plt.imshow(best_grain, interpolation='nearest', cmap=cm.jet, alpha=0.5)
-                        fig.savefig("out-{}.png".format(score))
-    except ScoreToLow:
-        continue
-
-logger.info("")
-logger.info("BEST SCORE:")
-logger.info(("###> ", best_val))
+# logger.info("")
+# logger.info("BEST SCORE:")
+# logger.info(("###> ", best_val))
 
 fig = plt.figure(figsize=(15, 8))
 plt.imshow(best_segment, interpolation='nearest', cmap=cm.gray)
 plt.imshow(best_grain, interpolation='nearest', cmap=cm.jet, alpha=0.5)
-fig.savefig("out.png")
+fig.savefig("../data/tmp/out.png")
+
+fig = plt.figure(figsize=(15, 8))
+plt.imshow(Sample("../data/tmp/segment_distord.png").get_image(), interpolation='nearest', cmap=cm.gray)
+plt.imshow(best_grain, interpolation='nearest', cmap=cm.jet, alpha=0.5)
+fig.savefig("../data/tmp/out3.png")
 
 # link to fix distorsion:
 # https://stackoverflow.com/questions/26602981/correct-barrel-distortion-in-opencv-manually-without-chessboard-image
