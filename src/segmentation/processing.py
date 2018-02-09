@@ -48,12 +48,12 @@ class LabyProcessing(object):
         wimg = img_back.copy()
 
         # Seuillage
-        wimg[np.where(wimg > self.threshold)] = 255
-        wimg[np.where(wimg <= self.threshold)] = 0
+        wimg[np.where(wimg > self.threshold)] = 0
+        wimg[np.where(wimg <= self.threshold)] = 255
 
         if self.apply_erode_dilate:
-            wimg = cv2.dilate(wimg, np.ones(self.kernel, np.uint8), iterations=self.no_erode)
             wimg = cv2.erode(wimg, np.ones(self.kernel, np.uint8), iterations=self.no_erode)
+            wimg = cv2.dilate(wimg, np.ones(self.kernel, np.uint8), iterations=self.no_erode)
 
         return wimg
 
