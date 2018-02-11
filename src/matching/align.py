@@ -8,44 +8,42 @@ from matplotlib import pyplot as plt, cm
 
 import argparse
 
-if __name__ == "__main__":
+from matching import matching_tools as mt
 
-    # Load conf
-    from matching.align_conf import *
+# Load external conf
+from matching.align_conf import *
 
-    parser = argparse.ArgumentParser('Image align input!')
+def __main__(args=None):
 
-    parser.add_argument("-seg_ref_path", type=str, required=True, help="Path to the segmented image")
-    parser.add_argument("-grain_ref_path", type=str, required=True, help="Path to the grain image")
-    parser.add_argument("-out_dir", type=str, required=True, help="Output directory (image overlap + affine.pkl)")
+    if args is None:
 
+        parser = argparse.ArgumentParser('Image align input!')
 
-    args = parser.parse_args()
+        parser.add_argument("-seg_ref_path", type=str, required=True, help="Path to the segmented image")
+        parser.add_argument("-grain_ref_path", type=str, required=True, help="Path to the grain image")
+        parser.add_argument("-out_dir", type=str, required=True, help="Output directory (image overlap + affine.pkl)")
+
+        args = parser.parse_args()
 
     id_segment = re.findall(r'\d+', os.path.basename(args.seg_ref_path))[0]
     id_grain = re.findall(r'\d+', os.path.basename(args.grain_ref_path))[0]
 
     assert id_grain == id_segment, "Mismatch between file's id : {} vs {}".format(args.seg_ref_path, args.grain_ref_path)
 
-    # Look for the ref segment/graincenter_rotationcenter_rotation
-    segment = Sample(args.seg_ref_path)  # Sample("../data/grain/Slice70wDistorsions.bmp")
+    # Look for the ref segment
+    segment = Sample(args.seg_ref_path)
     segment = segment.get_image()
-    segment_hash = segment.sum()
-
     segment[segment < 128] = 0
     segment[segment >= 128] = 255
 
     # Load gains
-    grain = Sample(args.grain_ref_path)#Sample("../data/grain/Slice70wDistorsions.bmp")
+    grain = Sample(args.grain_ref_path)
     grain = grain.get_image()
-    grain_hash = grain.sum()
-    grain = np.invert(grain) # we need the background to be black (default color for numpy transformation)
-
-
+    grain = np.invert(grain)  # we need the background to be black (default color for numpy transformation)
     grain[grain < 128] = 1
-    grain[grain >= 128] = 255 # put a different background
+    grain[grain >= 128] = 255  # put a different background
 
-    best_translation, best_angle = None, None
+    normalization_score = (grain == 255).sum()
 
     # Step 2: Look for best alignment
     print("Look for best alignment...")
@@ -71,16 +69,16 @@ if __name__ == "__main__":
             for ty in range_translation_y:
 
                 M_aff = np.float32([[1, 0, tx], [0, 1, ty]])
-                final_segment = cv2.warpAffine(rot_segment, M_aff, grain.shape[::-1])
+                align_segment = cv2.warpAffine(rot_segment, M_aff, grain.shape[::-1])
 
-                final_segment[final_segment < 128] = 0
-                final_segment[final_segment >= 128] = 255
+                align_segment[align_segment < 128] = 0
+                align_segment[align_segment >= 128] = 255
 
-                score = (grain == final_segment).sum() / (grain == 255).sum()
+                score = mt.compute_score(segment=align_segment, grain=grain, normalization=normalization_score)
 
                 if score > best_score:
                     best_score = score
-                    best_segment = final_segment
+                    best_segment = align_segment
                     best_val = (best_score, (tx, ty), angle)
                     print("Score: {0:.4f}, tx: {1}, ty: {2}, angle: {3}".format(float(best_score), tx, ty, angle))
 
@@ -114,3 +112,7 @@ if __name__ == "__main__":
         results_json = json.dumps(data)
         f.write(results_json.encode('utf8', 'replace'))
 
+    return best_score, best_segment, data
+
+if __name__ == "__main__":
+    __main__()

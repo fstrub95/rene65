@@ -69,7 +69,7 @@ if __name__ == "__main__":
     # create functional python tools
     # TODO: use a config file
     evaluator = Evaluator(expected_ratio=0.116, classif_index=255)
-    processor = LabyProcessing(114,
+    processor = LabyProcessing(threshold=114,
                                apply_denoising=True, denoising_factor=50,
                                apply_erode_dilate=True, no_erode=1,
                                apply_gaussblur=False)

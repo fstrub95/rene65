@@ -1,37 +1,38 @@
 import numpy as np
-import io
-import subprocess
+
 from multiprocessing.pool import ThreadPool
 import os
 import re
 
 from sample import Sample
 from matplotlib import pyplot as plt, cm
-
 import argparse
+from matching import matching_tools as mt
 
 import cma
 import collections
 
 DataPoints = collections.namedtuple('DataPoints', ['index', 'points'])
 
-if __name__ == "__main__":
+def __main__(args=None):
 
-    parser = argparse.ArgumentParser('Image segmentation input!')
+    if args is None:
 
-    parser.add_argument("-seg_ref_path", type=str, required=True, help="Path to the segmented image")
-    parser.add_argument("-grain_ref_path", type=str, required=True, help="Path to the grain image")
-    parser.add_argument("-out_dir", type=str, required=True, help="Directory with input image")
-    parser.add_argument("-tmp_dir", type=str, required=True, help="Directory to store intermediate results")
+        parser = argparse.ArgumentParser('Image segmentation input!')
 
-    parser.add_argument("-no_points", type=float, default=30, help="Ratio of image for eachpoint of the mesh")
-    parser.add_argument("-std_pixels", type=float, default=3, help="How far are going to look around the mesh ground (% of the image dimension)")
-    parser.add_argument("-max_sampling", type=int, default=3000, help="How far are going to look around the mesh ground (% of the image dimension)")
-    parser.add_argument("-polynom", type=int, default=3, help="Order of the polynom to compute distorsion")
+        parser.add_argument("-seg_ref_path", type=str, required=True, help="Path to the segmented image")
+        parser.add_argument("-grain_ref_path", type=str, required=True, help="Path to the grain image")
+        parser.add_argument("-out_dir", type=str, required=True, help="Directory with input image")
+        parser.add_argument("-tmp_dir", type=str, required=True, help="Directory to store intermediate results")
 
-    parser.add_argument("-no_thread", type=int, default=2, help="Number of thread to run execute the segmentation")
+        parser.add_argument("-no_points", type=float, default=25, help="Ratio of image for eachpoint of the mesh")
+        parser.add_argument("-std_pixels", type=float, default=7, help="How far are going to look around the mesh ground (% of the image dimension)")
+        parser.add_argument("-max_sampling", type=int, default=1000, help="How far are going to look around the mesh ground (% of the image dimension)")
+        parser.add_argument("-polynom", type=int, default=3, help="Order of the polynom to compute distorsion")
 
-    args = parser.parse_args()
+        parser.add_argument("-no_thread", type=int, default=2, help="Number of thread to run execute the segmentation")
+
+        args = parser.parse_args()
 
     # check that grain and segment are the same slice
     id_segment = re.findall(r'\d+', os.path.basename(args.seg_ref_path))[0]
@@ -47,7 +48,7 @@ if __name__ == "__main__":
     grain = Sample(args.grain_ref_path).get_image()
     grain = np.invert(grain)
 
-    grain[grain < 128] = 1
+    grain[grain < 128] = 1 # force non-grain values to have a different value than segment
     grain[grain >= 128] = 255
 
     # check that dimension match
@@ -55,7 +56,7 @@ if __name__ == "__main__":
 
     # compute initial score
     score_normalization = (grain == 255).sum()
-    init_score = (grain == segment).sum() / score_normalization
+    init_score = mt.compute_score(segment=segment, grain=grain, normalization=score_normalization)
     print("Init score : {0:.4f}".format(init_score))
 
     # Create initial mesh grid
@@ -66,11 +67,7 @@ if __name__ == "__main__":
     yv = yv.reshape(-1)
     mesh = np.concatenate((xv, yv)).astype(np.int32)
 
-    # define additional affine transformation TODO
-    # affine transformation tx, ty, angle
-    # affine_transformation = [0, 0, 0]
-
-    initial_points = mesh # np.concatenate([mesh, affine_transformation])
+    initial_points = mesh
 
     # prepare multithread distorsion
     pool = ThreadPool(processes=args.no_thread)
@@ -78,39 +75,29 @@ if __name__ == "__main__":
     # Create fitness function
     def fitness_fct(data):
 
-        str_buffer = io.BytesIO()
-        np.savetxt(str_buffer, data.points, fmt='%i')
-
         output_distord = '{tmp_dir}/segment_distord.{index}.png'.format(tmp_dir=args.tmp_dir, index=data.index)
 
-        subprocess.run('convert {input_segment} -virtual-pixel gray '
-                       '-distort polynomial "{polynom} {points}" '
-                       '{output_distord}'
-                       .format(input_segment=args.seg_ref_path,
-                               output_distord=output_distord,
-                               points=str_buffer.getvalue(),
-                               polynom=args.polynom), shell=True)
+        segment_distord = mt.apply_distortion(segment_in=args.seg_ref_path,
+                                              segment_out=output_distord,
+                                              polynom=args.polynom,
+                                              points=data.points)
 
-        segment_distord = Sample(output_distord).get_image()
+        score = mt.compute_score(segment=segment_distord, grain=grain, normalization=score_normalization)
 
-        segment_distord[segment_distord < 128] = 0
-        segment_distord[segment_distord >= 128] = 255
-
-        score = (grain == segment_distord).sum() / score_normalization
+        #Make the score negative as it is a minimization process
         score *= -1
 
         return score
 
     # prepare CME
     no_samples, best_score = 0, init_score
-    best_solution = None
     es = cma.CMAEvolutionStrategy(initial_points, args.std_pixels)
 
     # Start black-box optimization
     while not es.stop() and no_samples < args.max_sampling:
         solutions = es.ask()
 
-        #[tx, ty, angle] = solutions[-len(affine_transformation):]
+        #turn floating mesh into integer one (pixels are integer!)
         mesh_int = np.array(solutions, dtype=np.int32)
 
         # prepare data for multi-threading
@@ -125,12 +112,7 @@ if __name__ == "__main__":
         # compute the scores on separate threads (Not the imagemagick is then ran as a subprocess)
         scores = pool.map(fitness_fct, data)  # map keep the ordering
 
-        # store intermediate best sample
-        cur_best_score = min(scores)
-        if cur_best_score < best_score:
-            best_score = cur_best_score
-            best_solution = mesh_int[scores.index(cur_best_score)]
-
+        # store no_samples
         no_samples += len(scores)
 
         es.tell(solutions, scores)
@@ -139,38 +121,40 @@ if __name__ == "__main__":
     # Display results
     es.result_pretty()
 
-    # retrive the best mesh
+    # retrieve the best mesh
     final_mesh = es.result.xbest
-    final_mesh = np.array(final_mesh, dtype=np.int32)
 
     xv_dist = final_mesh[:len(xv)]
     yv_dist = final_mesh[len(xv):]
-
     transformation = np.stack([xv, yv, xv_dist, yv_dist]).transpose()
+    transformation = transformation.astype(np.int32)
 
     # Define path to save results
     out_distord = '{tmp_dir}/segment_distord.{index}.png'.format(tmp_dir=args.tmp_dir, index=id_slice)
     out_image = os.path.join(args.out_dir, "overlap.distord.slice{}.png".format(id_slice))
-    out_points = os.path.join(args.out_dir, "points.slice{}.txt".format(id_slice))
+    out_points = os.path.join(args.out_dir, "mesh.{}.txt".format(id_slice))
 
     # Store points for transformation
     np.savetxt(out_points, transformation, fmt='%i')
 
     # Recompute best transformation
-    best_data = DataPoints(index=id_slice, points=transformation)
-    fitness_fct(best_data)
+    final_segment = mt.apply_distortion(segment_in=args.seg_ref_path,
+                        segment_out=out_distord,
+                        polynom=args.polynom,
+                        points=transformation)
+
+    best_score = mt.compute_score(segment=final_segment, grain=grain, normalization=score_normalization)
 
     # Plot how grain/segment overlap
-    distord_segment = Sample(out_distord).get_image()
-    distord_segment[distord_segment  < 128] = 0
-    distord_segment[distord_segment >= 128] = 255
-
     fig = plt.figure(figsize=(15, 8))
-    plt.imshow(distord_segment, interpolation='nearest', cmap=cm.gray)
+    plt.imshow(final_segment, interpolation='nearest', cmap=cm.gray)
     plt.imshow(grain, interpolation='nearest', cmap=cm.jet, alpha=0.5)
     fig.savefig(out_image)
 
+    return best_score, final_segment, transformation
 
+if __name__ == "__main__":
+    __main__()
 
 
 
