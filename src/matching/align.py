@@ -13,6 +13,7 @@ from matching import matching_tools as mt
 # Load external conf
 from matching.align_conf import *
 
+
 def __main__(args=None):
 
     if args is None:
@@ -21,7 +22,12 @@ def __main__(args=None):
 
         parser.add_argument("-seg_ref_path", type=str, required=True, help="Path to the segmented image")
         parser.add_argument("-grain_ref_path", type=str, required=True, help="Path to the grain image")
+        parser.add_argument("-align_dir", type=str, required=True, help="Output directory (segment crop)")
         parser.add_argument("-out_dir", type=str, required=True, help="Output directory (image overlap + affine.pkl)")
+
+        parser.add_argument("-invert_segment", type=bool, default=False, help="Put True if background is white")
+        parser.add_argument("-invert_grain", type=bool, default=False, help="Put True if background is white")
+
 
         args = parser.parse_args()
 
@@ -33,13 +39,20 @@ def __main__(args=None):
     # Look for the ref segment
     segment = Sample(args.seg_ref_path)
     segment = segment.get_image()
+
+    if args.invert_segment:
+        segment = np.invert(segment)  # we need the background to be black (default color for numpy transformation)
+
     segment[segment < 128] = 0
     segment[segment >= 128] = 255
 
     # Load gains
     grain = Sample(args.grain_ref_path)
     grain = grain.get_image()
-    grain = np.invert(grain)  # we need the background to be black (default color for numpy transformation)
+
+    if args.invert_grain:
+        grain = np.invert(grain)  # we need the background to be black (default color for numpy transformation)
+
     grain[grain < 128] = 1
     grain[grain >= 128] = 255  # put a different background
 
@@ -56,7 +69,7 @@ def __main__(args=None):
         M_rot = cv2.getRotationMatrix2D(center_rotation, angle, 1)
         rot_segment = cv2.warpAffine(segment, M_rot, segment.shape[::-1])
 
-        # Note: we perform the precrop to rotate
+        # Note: we perform the precrop after rotate
         if precrop is not None:
             rot_segment = rot_segment[precrop.x_min:precrop.x_max, precrop.y_min:precrop.y_max]
 
@@ -91,6 +104,10 @@ def __main__(args=None):
     print(" - ty  :  ", ty)
     print(" - rot : ", angle)
     print("----------------------------------------------")
+
+    # Plot crop/align segment
+    filename_out = os.path.join(args.align_dir, "segment.align.{}.png".format(id_grain))
+    cv2.imwrite(filename_out, best_segment)
 
     # Plot overlap visualization
     fig = plt.figure(figsize=(15, 8))

@@ -1,7 +1,6 @@
 import argparse
 import multiprocessing
 import os
-import logging
 import numpy as np
 import cv2
 import math
@@ -9,19 +8,7 @@ import math
 from segmentation.evaluation import Evaluator
 from segmentation.processing import LabyProcessing
 
-from misc.logger import create_logger
-
 from sample import Sample
-
-
-# def show_img(img):
-#     cv2.namedWindow('image', cv2.WINDOW_NORMAL)
-#     cv2.resizeWindow('image', 600, 600)
-#     cv2.imshow('image', img)
-#     cv2.waitKey(0)
-#
-# def save_img(img, filename="img"):
-#     cv2.imwrite(os.path.join(folder_out, "{}.png".format(filename)), img)
 
 
 def process_and_evaluate(data):
@@ -31,8 +18,7 @@ def process_and_evaluate(data):
     evaluator = data["evaluator"]
     processor = data["processor"]
 
-    logger = logging.getLogger()
-    logger.info("Processing file: {}".format(filename_in))
+    print("Processing file: {}".format(filename_in))
 
     # Load image
     sample = Sample(filename_in, crop_bottom=0.10)
@@ -44,7 +30,7 @@ def process_and_evaluate(data):
     s, _ = evaluator.evaluate(final_img)
 
     # dump segmentation
-    logger.info("Dumping file: {} - MAE: {}".format(filename_out, math.fabs(s)))
+    print("Dumping file: {} - MAE: {}".format(filename_out, math.fabs(s)))
     cv2.imwrite(filename_out, final_img)
 
     return s
@@ -62,18 +48,15 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     # create technical python tools
-    logger = create_logger(os.path.join(args.seg_dir, "log.txt"))
     pool = multiprocessing.Pool(processes=args.no_thread)
-
 
     # create functional python tools
     # TODO: use a config file
-    evaluator = Evaluator(expected_ratio=0.116, classif_index=255)
+    evaluator = Evaluator(expected_ratio=0.116)
     processor = LabyProcessing(threshold=114,
                                apply_denoising=True, denoising_factor=50,
                                apply_erode_dilate=True, no_erode=1,
                                apply_gaussblur=False)
-
 
     # Prepare sample for parallel computation
     data = []
@@ -82,13 +65,12 @@ if __name__ == "__main__":
         if sample_filename.endswith(args.img_ext):
 
             d = {
-                "filename_in" : os.path.join(args.img_dir,sample_filename),
+                "filename_in": os.path.join(args.img_dir, sample_filename),
                 "filename_out": os.path.join(args.seg_dir, sample_filename),
-                "evaluator" : evaluator,
-                "processor" : processor
+                "evaluator": evaluator,
+                "processor": processor
             }
             data.append(d)
-
 
     # execute multiprocessor script
     diff = pool.map(process_and_evaluate, data)
@@ -97,6 +79,6 @@ if __name__ == "__main__":
     error = np.sqrt(np.sum(np.square(diff))) / len(diff)
 
     # Print RMSE
-    logger.info("RMSE : {}".format(error))
+    print("RMSE : {}".format(error))
 
 

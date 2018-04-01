@@ -2,8 +2,7 @@ import numpy as np
 
 class Evaluator(object):
 
-    def __init__(self, expected_ratio, classif_index=255):
-        self.classif_index = classif_index
+    def __init__(self, expected_ratio):
         self.expected_ratio = expected_ratio
 
     def evaluate(self, img_to_eval):

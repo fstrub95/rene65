@@ -4,6 +4,16 @@ import numpy as np
 
 #TODO split the processing into subfonction + provide a list of processor
 
+def show_img(img):
+    cv2.namedWindow('image', cv2.WINDOW_NORMAL)
+    cv2.resizeWindow('image', 600, 600)
+    cv2.imshow('image', img)
+    cv2.waitKey(0)
+
+def save_img(img, filename="img"):
+    cv2.imwrite("{}.png".format(filename), img)
+
+
 class LabyProcessing(object):
 
     def __init__(self, threshold,
@@ -48,8 +58,8 @@ class LabyProcessing(object):
         wimg = img_back.copy()
 
         # Seuillage
-        wimg[np.where(wimg > self.threshold)] = 0
-        wimg[np.where(wimg <= self.threshold)] = 255
+        wimg[np.where(img_back > self.threshold)] = 0
+        wimg[np.where(img_back <= self.threshold)] = 255
 
         if self.apply_erode_dilate:
             wimg = cv2.erode(wimg, np.ones(self.kernel, np.uint8), iterations=self.no_erode)

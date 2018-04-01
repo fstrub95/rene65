@@ -1,6 +1,5 @@
 import numpy as np
 
-from multiprocessing.pool import ThreadPool
 import os
 import re
 
@@ -13,6 +12,7 @@ import cma
 import collections
 
 DataPoints = collections.namedtuple('DataPoints', ['index', 'points'])
+
 
 def __main__(args=None):
 
@@ -27,7 +27,7 @@ def __main__(args=None):
 
         parser.add_argument("-no_points", type=float, default=25, help="Ratio of image for eachpoint of the mesh")
         parser.add_argument("-std_pixels", type=float, default=7, help="How far are going to look around the mesh ground (% of the image dimension)")
-        parser.add_argument("-max_sampling", type=int, default=1000, help="How far are going to look around the mesh ground (% of the image dimension)")
+        parser.add_argument("-max_sampling", type=int, default=2000, help="How far are going to look around the mesh ground (% of the image dimension)")
         parser.add_argument("-polynom", type=int, default=3, help="Order of the polynom to compute distorsion")
 
         parser.add_argument("-no_thread", type=int, default=2, help="Number of thread to run execute the segmentation")
@@ -69,25 +69,8 @@ def __main__(args=None):
 
     initial_points = mesh
 
-    # prepare multithread distorsion
-    pool = ThreadPool(processes=args.no_thread)
+    segment = Sample(args.seg_ref_path).get_image()
 
-    # Create fitness function
-    def fitness_fct(data):
-
-        output_distord = '{tmp_dir}/segment_distord.{index}.png'.format(tmp_dir=args.tmp_dir, index=data.index)
-
-        segment_distord = mt.apply_distortion(segment_in=args.seg_ref_path,
-                                              segment_out=output_distord,
-                                              polynom=args.polynom,
-                                              points=data.points)
-
-        score = mt.compute_score(segment=segment_distord, grain=grain, normalization=score_normalization)
-
-        #Make the score negative as it is a minimization process
-        score *= -1
-
-        return score
 
     # prepare CME
     no_samples, best_score = 0, init_score
@@ -97,20 +80,26 @@ def __main__(args=None):
     while not es.stop() and no_samples < args.max_sampling:
         solutions = es.ask()
 
-        #turn floating mesh into integer one (pixels are integer!)
+        # turn floating mesh into integer one (pixels are integer!)
         mesh_int = np.array(solutions, dtype=np.int32)
 
         # prepare data for multi-threading
-        data = []
-        for i, s in enumerate(mesh_int):
+        scores = []
+        for s in mesh_int:
             xv_dist = s[:len(xv)]
             yv_dist = s[len(xv):]
 
             transformation = np.stack([xv, yv, xv_dist, yv_dist]).transpose()
-            data.append(DataPoints(index=i, points=transformation))
 
-        # compute the scores on separate threads (Not the imagemagick is then ran as a subprocess)
-        scores = pool.map(fitness_fct, data)  # map keep the ordering
+            segment_distord = mt.apply_distortion(segment=segment,
+                                                  points=transformation,
+                                                  polynom=args.polynom)
+
+            score = mt.compute_score(segment=segment_distord, grain=grain, normalization=score_normalization)
+
+            # Make the score negative as it is a minimization process
+            score *= -1
+            scores.append(score)
 
         # store no_samples
         no_samples += len(scores)
@@ -138,10 +127,10 @@ def __main__(args=None):
     np.savetxt(out_points, transformation, fmt='%i')
 
     # Recompute best transformation
-    final_segment = mt.apply_distortion(segment_in=args.seg_ref_path,
-                        segment_out=out_distord,
-                        polynom=args.polynom,
-                        points=transformation)
+    final_segment = mt.apply_distortion(segment=segment,
+                                        segment_path_out=out_distord,
+                                        polynom=args.polynom,
+                                        points=transformation)
 
     best_score = mt.compute_score(segment=final_segment, grain=grain, normalization=score_normalization)
 
@@ -152,6 +141,7 @@ def __main__(args=None):
     fig.savefig(out_image)
 
     return best_score, final_segment, transformation
+
 
 if __name__ == "__main__":
     __main__()
