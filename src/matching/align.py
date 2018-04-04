@@ -118,7 +118,7 @@ def __main__(args=None):
     # Dump affine.pkl with all the required information to perform the affine transformation
     data = dict()
     with open(os.path.join(args.out_dir, "affine.{}.json".format(id_grain)) , "wb") as f:
-        data["id_slice"] = id_grain
+        data["id_slice"] = int(id_grain)
         data["rescale"] = [rescale_x, rescale_y]
         data["translate"] = [tx, ty]
         data["angle"] = angle
