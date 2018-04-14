@@ -62,6 +62,10 @@ eval_ratio_segment = mt.compute_score(segment=grain, grain=eval_distord_segment)
 print(train_ratio_grain, eval_ratio_grain)
 print(train_ratio_segment, eval_ratio_segment)
 
-
-
+# Plot how grain/segment overlap
+from matplotlib import pyplot as plt, cm
+fig = plt.figure(figsize=(15, 8))
+plt.imshow(eval_ratio_segment, interpolation='nearest', cmap=cm.gray)
+plt.imshow(grain, interpolation='nearest', cmap=cm.jet, alpha=0.5)
+fig.savefig("../../data/AM718/eval.generalization.overlap.png")
 
