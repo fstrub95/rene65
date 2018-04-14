@@ -5,6 +5,8 @@ import cv2
 
 from sample import Sample
 from matplotlib import pyplot as plt, cm
+from matching import matching_tools as mt
+
 
 import argparse
 
@@ -15,8 +17,9 @@ if __name__ == "__main__":
 
     parser = argparse.ArgumentParser('Image align input!')
 
-    parser.add_argument("-seg_dir", type=str, required=True, help="Path to the segmented image")
-    parser.add_argument("-grain_dir", type=str, required=True, help="Path to the grain image")
+    parser.add_argument("-seg_ref_path", type=str, required=True, help="Path to the segmented image")
+    parser.add_argument("-grain_ref_path", type=str, required=True, help="Path to the grain image")
+
     parser.add_argument("-out_dir", type=str, required=True, help="Directory to output segment.align")
     parser.add_argument("-tmp_dir", type=str, required=True, help="Directory to store intermediate results")
 
@@ -62,29 +65,15 @@ if __name__ == "__main__":
         segment_file = os.path.join(args.seg_dir, segment_filename)
         segment = Sample(segment_file).get_image()
 
-        center_rotation = (segment.shape[0] / 2, segment.shape[1] / 2)
-        M_rot = cv2.getRotationMatrix2D(center_rotation, angle, 1)
-        rot_segment = cv2.warpAffine(segment, M_rot, segment.shape[::-1])
+        aligner = mt.Aligner(precrop=precrop,
+                             rescale=(rescale_x, rescale_y))
 
-        # Note: we perform the precrop to rotate
-        if precrop is not None:
-            rot_segment = rot_segment[precrop.x_min:precrop.x_max, precrop.y_min:precrop.y_max]
+        # perform alignment
+        final_segment, score = aligner.apply(
+            grain=grain, segment=segment,
+            tx=tx, ty=ty,
+            angle=angle)
 
-        if rescale_x != 1 and rescale_y != 1:
-            rot_segment = cv2.resize(rot_segment, None,
-                                 fx=rescale_x,
-                                 fy=rescale_y, interpolation=cv2.INTER_AREA)
-
-        # Apply affine transformation
-        M_aff = np.float32([[1, 0, tx], [0, 1, ty]])
-        final_segment = cv2.warpAffine(rot_segment, M_aff, grain.shape)
-
-        final_segment[final_segment < 128] = 0
-        final_segment[final_segment >= 128] = 255
-
-        #compute score
-        score = (grain == final_segment).sum() / (grain == 255).sum()
-        coverage += score
         print("Slice {0} : {1:.4f}".format(id_grain,score))
 
         # dump overlap for visual interpretation

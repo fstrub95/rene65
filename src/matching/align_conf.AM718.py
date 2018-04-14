@@ -18,7 +18,7 @@ rescale_x = 0.4088
 rescale_y = 0.4088
 
 # Grid Search
-range_angle = np.arange(-1, 1, 0.25)
-range_translation_x = range(-100, -70, 1)
-range_translation_y = range(-140, -110, 1)
+range_angle = np.arange(-6, -4, 0.25)
+range_translation_x = range(-90, -70, 1)
+range_translation_y = range(-130, -100, 1)
 
