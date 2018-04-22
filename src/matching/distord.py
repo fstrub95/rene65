@@ -25,10 +25,10 @@ def __main__(args=None):
         parser.add_argument("-out_dir", type=str, required=True, help="Directory with input image")
         parser.add_argument("-tmp_dir", type=str, required=True, help="Directory to store intermediate results")
 
-        parser.add_argument("-no_points", type=float, default=25, help="Ratio of image for eachpoint of the mesh")
-        parser.add_argument("-no_points_step", type=float, help="Use an absolute step size instead of no_points")
+        parser.add_argument("-no_points", type=float, default=None, help="Ratio of image for eachpoint of the mesh")
+        parser.add_argument("-no_points_step", type=float, default=75, help="Use an absolute step size instead of no_points")
         parser.add_argument("-std_pixels", type=float, default=7, help="How far are going to look around the mesh ground (% of the image dimension)")
-        parser.add_argument("-max_sampling", type=int, default=2000, help="How far are going to look around the mesh ground (% of the image dimension)")
+        parser.add_argument("-max_sampling", type=int, default=2500, help="How far are going to look around the mesh ground (% of the image dimension)")
         parser.add_argument("-polynom", type=int, default=3, help="Order of the polynom to compute distorsion")
 
         args = parser.parse_args()
@@ -60,16 +60,34 @@ def __main__(args=None):
 
     # Create initial mesh grid
     if args.no_points_step is not None:
-        x = np.arange(0, segment.shape[0], args.no_points_step)
-        y = np.arange(0, segment.shape[1], args.no_points_step)
+        x = np.arange(0, segment.shape[1], args.no_points_step)
+        y = np.arange(0, segment.shape[0], args.no_points_step)
     else:
-        x = np.linspace(0, segment.shape[0], args.no_points)
-        y = np.linspace(0, segment.shape[1], args.no_points)
+        x = np.linspace(0, segment.shape[1], args.no_points)
+        y = np.linspace(0, segment.shape[0], args.no_points)
 
     xv, yv = np.meshgrid(x, y)
     xv = xv.reshape(-1)
     yv = yv.reshape(-1)
+
+    reduce_xv, reduce_yv = [], []
+    for x, y in zip(xv, yv):
+
+        x_left = max((x - args.no_points_step), 0)
+        x_right = min((x + args.no_points_step), segment.shape[1])
+
+        y_bottom = max((y - args.no_points_step), 0)
+        y_up = min((y + args.no_points_step), segment.shape[0])
+
+        sub_segment = segment[y_bottom:y_up, x_left:x_right]
+        if sub_segment.sum() > 0:
+            reduce_xv.append(x)
+            reduce_yv.append(y)
+
+    # Remove useless points:
+    xv, yv = reduce_xv, reduce_yv
     mesh = np.concatenate((xv, yv)).astype(np.int32)
+
 
     initial_points = mesh
 
@@ -146,6 +164,11 @@ def __main__(args=None):
     plt.imshow(final_segment, interpolation='nearest', cmap=cm.gray)
     plt.imshow(grain, interpolation='nearest', cmap=cm.jet, alpha=0.5)
     fig.savefig(out_image)
+
+    fig, ax = plt.subplots(figsize=(15, 8))
+    ax.imshow(final_segment)
+    ax.plot(transformation[:, 2], transformation[:, 3], '.')
+    plt.show()
 
     return best_score, final_segment, transformation
 

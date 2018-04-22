@@ -7,9 +7,9 @@ from sample import Sample
 
 from sklearn.metrics import jaccard_similarity_score
 
-no_points = 25
+no_points_step = 75
 std_pixels = 7
-max_sampling = 4000
+max_sampling = 3000
 polynom = 3
 
 
@@ -22,11 +22,11 @@ for i in range(0, 10):
     args = argparse.Namespace(
         seg_ref_path="../../data/AM718/segment.align.718.png",
         grain_ref_path="../../data/AM718/AM718_speckle_straight.tif",
-        out_dir="../../data/AM718/tmp",
-        tmp_dir="../../data/AM718/tmp",
+        out_dir="../../data/AM718/tmp/{}/".format(i),
+        tmp_dir="../../data/AM718/tmp/{}/".format(i),
 
-        no_points=no_points,
-        no_points_step=None,
+        no_points=None,
+        no_points_step=no_points_step,
         std_pixels=std_pixels,
         max_sampling=max_sampling,
         polynom=polynom,

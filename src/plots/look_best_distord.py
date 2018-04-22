@@ -4,9 +4,9 @@ import argparse
 import itertools
 
 std_pixels = [3, 5, 7, 10, 15]
-no_points_step = [10, 20, 35, 50, 75, 100]
-max_sampling = 2000
-polynom = [2, 3, 4, 5]
+no_points_step = [50, 75, 100]
+max_sampling = 3000
+polynom = [2]
 
 best_score = 0
 
