@@ -31,6 +31,8 @@ def __main__(args=None):
         parser.add_argument("-max_sampling", type=int, default=2500, help="How far are going to look around the mesh ground (% of the image dimension)")
         parser.add_argument("-polynom", type=int, default=3, help="Order of the polynom to compute distorsion")
 
+        parser.add_argument("-invert_grain", type=bool, default=False, help="Put True if background is white")
+
         args = parser.parse_args()
 
     # check that grain and segment are the same slice
@@ -45,7 +47,8 @@ def __main__(args=None):
 
     # Load grain
     grain = Sample(args.grain_ref_path).get_image()
-    grain = np.invert(grain)
+    if args.invert_grain:
+        grain = np.invert(grain)  # we need the background to be black (default color for numpy transformation)
 
     grain[grain < 128] = 1 # force non-grain values to have a different value than segment
     grain[grain >= 128] = 255
