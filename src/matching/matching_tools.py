@@ -107,7 +107,7 @@ class Aligner(object):
             M_rot = cv2.getRotationMatrix2D(center_rotation, angle, 1)
             segment = cv2.warpAffine(ebsd, M_rot, ebsd.shape[::-1])
 
-        return segment
+        return ebsd
 
     @staticmethod
     def __crop__(segment, precrop):
@@ -135,7 +135,7 @@ class Aligner(object):
         M_aff = np.float32([[1, 0, tx], [0, 1, ty]])
         segment = cv2.warpAffine(ebsd, M_aff, shape)
 
-        return segment
+        return ebsd
 
     @staticmethod
     def __postprocess__(segment, ebsd, normalization_score=None):
