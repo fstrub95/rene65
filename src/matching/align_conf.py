@@ -14,11 +14,14 @@ precrop = None
 #     x_max=1200, y_max=2800
 # )
 
-rescale_x = 0.4088
-rescale_y = 0.4088
+rescale_x = 0.4699
+rescale_y = 0.338
 
 # Grid Search
-range_angle = np.arange(-1, 1, 0.25)
-range_translation_x = range(-100, -70, 1)
-range_translation_y = range(-140, -110, 1)
+range_angle = np.arange(3, 5, 1)
+range_translation_x = range(-300, -200, 1)
+range_translation_y = range(-110, -90, 1)
+# )
+
+
 
