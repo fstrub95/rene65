@@ -27,7 +27,7 @@ import uuid
 tmp_uiid = uuid.uuid1()
 
 # Create fitness function
-def apply_distortion(ebsd, points, polynom, segment_path_out=None, use_image_magick=True,
+def apply_distortion(ebsd, points, polynom, ebsd_path_out=None, use_image_magick=True,
                      verbose=False):
 
     if use_image_magick:
@@ -84,8 +84,8 @@ def apply_distortion(ebsd, points, polynom, segment_path_out=None, use_image_mag
     ebsd_distord[ebsd_distord < 128] = 0
     ebsd_distord[ebsd_distord >= 128] = 255
 
-    if segment_path_out is not None:
-        cv2.imwrite(segment_path_out, img=ebsd_distord)
+    if ebsd_path_out is not None:
+        cv2.imwrite(ebsd_path_out, img=ebsd_distord)
 
     return ebsd_distord
 
