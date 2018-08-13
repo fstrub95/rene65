@@ -1,0 +1,23 @@
+{
+  rescale = {
+    x = 0.408,
+    y = 0.408
+  },
+
+
+
+
+}
+
+# Preprocessing
+precrop = None
+# precrop = Crop(
+#
+# )
+
+
+# Grid Search
+range_angle = np.arange(-6, -4, 0.25)
+range_translation_x = range(-90, -70, 1)
+range_translation_y = range(-130, -100, 1)
+

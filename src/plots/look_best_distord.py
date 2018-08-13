@@ -6,7 +6,7 @@ import itertools
 std_pixels = [3, 5, 7, 10, 15]
 no_points_step = [50, 75, 100]
 max_sampling = 3000
-polynom = [2]
+polynom = [3]
 
 best_score = 0
 
@@ -25,6 +25,8 @@ for (std, step, p) in itertools.product(*[std_pixels, no_points_step, polynom]):
         std_pixels=std,
         max_sampling=max_sampling,
         polynom=p,
+
+        invert_grain=True,
     )
 
     score, _, _ = distord.__main__(args)

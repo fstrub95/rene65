@@ -8,17 +8,16 @@ Crop = collections.namedtuple("Crop", ["x_min", "x_max", "y_min", "y_max"])
 
 
 # Preprocessing
-precrop = None
-# precrop = Crop(
-#     x_min=100, y_min=100,
-#     x_max=1200, y_max=2800
-# )
+precrop = Crop(
+    x_min=0, y_min=700,
+    x_max=1565, y_max=2715
+)
 
-rescale_x = 0.4088
-rescale_y = 0.4088
+rescale_x = 0.3265
+rescale_y = 0.3265
 
 # Grid Search
-range_angle = np.arange(-1, 1, 0.25)
-range_translation_x = range(-100, -70, 1)
-range_translation_y = range(-140, -110, 1)
+range_angle = np.arange(-3.0, -1, 0.25)
+range_translation_x = range(-30, 10, 1)
+range_translation_y = range(100, 140, 1)
 

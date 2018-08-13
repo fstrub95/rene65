@@ -42,9 +42,6 @@ def __main__(args=None):
     if args.invert_segment:
         segment = np.invert(segment)  # we need the background to be black (default color for numpy transformation)
 
-    segment[segment < 128] = 0
-    segment[segment >= 128] = 255
-
     # Load gains
     grain = Sample(args.grain_ref_path)
     grain = grain.get_image()
@@ -52,19 +49,13 @@ def __main__(args=None):
     if args.invert_grain:
         grain = np.invert(grain)  # we need the background to be black (default color for numpy transformation)
 
-    grain[grain < 128] = 1
-    grain[grain >= 128] = 255  # put a different background
-
-    normalization_score = (grain == 255).sum()
-
     # Step 2: Look for best alignment
     print("Look for best alignment...")
     best_score = 0
     best_val, best_segment = None, None
 
     aligner = mt.Aligner(precrop=precrop,
-                         rescale=(rescale_x, rescale_y),
-                         normalization_score=normalization_score)
+                         rescale=(rescale_x, rescale_y))
 
     for angle in range_angle:
 
@@ -85,6 +76,13 @@ def __main__(args=None):
                     best_segment = np.copy(align_segment)
                     best_val = (best_score, (tx, ty), angle)
                     print("Score: {0:.4f}, tx: {1}, ty: {2}, angle: {3}".format(float(best_score), tx, ty, angle))
+
+                    out_image = os.path.join(args.out_dir, "yO-overlap.distord.png")
+                    fig = plt.figure(figsize=(15, 8))
+                    plt.imshow(align_segment, interpolation='nearest', cmap=cm.gray)
+                    plt.imshow(grain, interpolation='nearest', cmap=cm.jet, alpha=0.5)
+                    fig.savefig(out_image)
+
 
     # Display results
     (best_score, (tx, ty), angle) = best_val

@@ -21,14 +21,16 @@ def __main__(args=None):
         parser = argparse.ArgumentParser('Image segmentation input!')
 
         parser.add_argument("-seg_ref_path", type=str, required=True, help="Path to the segmented image")
-        parser.add_argument("-grain_ref_path", type=str, required=True, help="Path to the grain image")
+        parser.add_argument("-ebsd_ref_path", type=str, required=True, help="Path to the grain image")
+
         parser.add_argument("-out_dir", type=str, required=True, help="Directory with input image")
+
         parser.add_argument("-tmp_dir", type=str, required=True, help="Directory to store intermediate results")
 
         parser.add_argument("-no_points", type=float, default=None, help="Ratio of image for eachpoint of the mesh")
         parser.add_argument("-no_points_step", type=float, default=75, help="Use an absolute step size instead of no_points")
         parser.add_argument("-std_pixels", type=float, default=7, help="How far are going to look around the mesh ground (% of the image dimension)")
-        parser.add_argument("-max_sampling", type=int, default=2500, help="How far are going to look around the mesh ground (% of the image dimension)")
+        parser.add_argument("-max_sampling", type=int, default=1000, help="How far are going to look around the mesh ground (% of the image dimension)")
         parser.add_argument("-polynom", type=int, default=3, help="Order of the polynom to compute distorsion")
 
         parser.add_argument("-invert_grain", type=bool, default=False, help="Put True if background is white")
@@ -36,29 +38,26 @@ def __main__(args=None):
         args = parser.parse_args()
 
     # check that grain and segment are the same slice
-    id_segment = re.findall(r'\d+', os.path.basename(args.seg_ref_path))[0]
-    id_grain = re.findall(r'\d+', os.path.basename(args.grain_ref_path))[0]
-    id_slice = id_segment
+    # id_segment = re.findall(r'\d+', os.path.basename(args.seg_ref_path))[0]
+    # id_grain = re.findall(r'\d+', os.path.basename(args.ebsd_ref_path))[0]
+    # id_slice = id_segment
+    id_slice = 0
 
-    assert id_grain == id_segment, "Mismatch between file's id : {} vs {}".format(args.seg_ref_path, args.grain_ref_path)
+    # assert id_grain == id_segment, "Mismatch between file's id : {} vs {}".format(args.seg_ref_path, args.grain_ref_path)
 
     # Load segment (need to be preprocess by align.py)
     segment = Sample(args.seg_ref_path).get_image()
 
     # Load grain
-    grain = Sample(args.grain_ref_path).get_image()
+    grain = Sample(args.ebsd_ref_path).get_image()
     if args.invert_grain:
         grain = np.invert(grain)  # we need the background to be black (default color for numpy transformation)
-
-    grain[grain < 128] = 1 # force non-grain values to have a different value than segment
-    grain[grain >= 128] = 255
 
     # check that dimension match
     assert segment.shape == grain.shape, "Grain and shape must be of the same dimension"
 
     # compute initial score
-    score_normalization = (grain == 255).sum()
-    init_score = mt.compute_score(segment=segment, grain=grain, normalization=score_normalization)
+    init_score = mt.compute_score(segment=segment, grain=grain)
     print("Init score : {0:.4f}".format(init_score))
 
     # Create initial mesh grid
@@ -91,7 +90,6 @@ def __main__(args=None):
     xv, yv = reduce_xv, reduce_yv
     mesh = np.concatenate((xv, yv)).astype(np.int32)
 
-
     initial_points = mesh
 
     segment = Sample(args.seg_ref_path).get_image()
@@ -99,7 +97,9 @@ def __main__(args=None):
 
     # prepare CME
     no_samples, best_score = 0, init_score
-    es = cma.CMAEvolutionStrategy(initial_points, args.std_pixels)
+    es = cma.CMAEvolutionStrategy(initial_points, args.std_pixels)#, {'seed': 123})
+
+    all_scores = []
 
     # Start black-box optimization
     while not es.stop() and no_samples < args.max_sampling:
@@ -116,11 +116,18 @@ def __main__(args=None):
 
             transformation = np.stack([xv, yv, xv_dist, yv_dist]).transpose()
 
-            segment_distord = mt.apply_distortion(segment=segment,
+            segment_distord = mt.apply_distortion(segment=segment, ebsd=grain,
                                                   points=transformation,
                                                   polynom=args.polynom)
 
-            score = mt.compute_score(segment=segment_distord, grain=grain, normalization=score_normalization)
+            # out_image = os.path.join(args.out_dir, "yO-overlap.distord.slice{}.png".format(id_slice))
+            # fig = plt.figure(figsize=(15, 8))
+            # plt.imshow(segment_distord, interpolation='nearest', cmap=cm.gray)
+            # plt.imshow(grain, interpolation='nearest', cmap=cm.jet, alpha=0.5)
+            # fig.savefig(out_image)
+
+            score = mt.compute_score(segment=segment_distord, grain=grain)
+            all_scores.append(score)
 
             # Make the score negative as it is a minimization process
             score *= -1
@@ -152,15 +159,20 @@ def __main__(args=None):
     np.savetxt(out_points, transformation, fmt='%i')
 
     # Recompute best transformation
-    final_segment = mt.apply_distortion(segment=segment,
+    final_segment = mt.apply_distortion(segment=segment, ebsd=grain,
                                         segment_path_out=out_distord,
                                         polynom=args.polynom,
                                         points=transformation,
                                         verbose=True)
 
     best_score = mt.compute_score(segment=final_segment,
-                                  grain=grain,
-                                  normalization=score_normalization)
+                                  grain=grain)
+
+    print("Final best score : {0:.4f}".format(best_score))
+
+    score = (grain == final_segment).sum() / (grain == 255).sum()
+    print("Final best old score : {0:.4f}".format(score))
+
 
     # Plot how grain/segment overlap
     fig = plt.figure(figsize=(15, 8))
@@ -168,12 +180,22 @@ def __main__(args=None):
     plt.imshow(grain, interpolation='nearest', cmap=cm.jet, alpha=0.5)
     fig.savefig(out_image)
 
-    fig, ax = plt.subplots(figsize=(15, 8))
-    ax.imshow(final_segment)
-    ax.plot(transformation[:, 2], transformation[:, 3], '.')
-    plt.show()
+    # fig, ax = plt.subplots(figsize=(15, 8))
+    # ax.imshow(final_segment)
+    # ax.plot(transformation[:, 2], transformation[:, 3], '.')
+    # plt.show()
 
-    return best_score, final_segment, transformation
+    # # Create ang file
+    # from crystallography.tsl import OimScan
+    # ang_object = OimScan("/home/fstrub/Downloads/drive-download-20180401T213826Z-001/AM718/AM718.ang")
+    #
+    # # Dump overlap segment/iq
+    # fig = plt.figure(figsize=(15, 8))
+    # plt.imshow(segment, interpolation='nearest', cmap=cm.gray)
+    # plt.imshow(ang_object.iq, interpolation='nearest', cmap=cm.jet, alpha=0.5)
+    # fig.savefig(os.path.join(args.tmp_dir, "overlap_seg_id.{}.png".format(id_segment)))
+
+    return best_score, final_segment, transformation, all_scores
 
 
 if __name__ == "__main__":

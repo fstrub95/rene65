@@ -176,7 +176,7 @@ class OimScan:
 				#stackedData = numpy.stack((self.euler[:,:,0], self.euler[:,:,1], self.euler[:,:,2], self.x, self.y, self.iq, self.ci, self.phase))
 				print('now stackedData shape is ', stackedData.shape)
 			
-			if self.gridType is Grid.Square:
+			if self.gridType == Grid.Square:
         # create an line by line array iterable
 				data = numpy.reshape(stackedData, (stackedData.shape[0] * stackedData.shape[1], stackedData.shape[2]))
 				file.write('\n'.join(map(lambda line: ' '.join(map(str, line)), data)))
@@ -186,6 +186,7 @@ class OimScan:
 				for j in range(self.rows):
 					for i in range(self.colsOdd if oddRow else self.colsEven):
 						tokens = stackedData[:,j,i]
+
 						file.write(' '.join([str(item) for item in stackedData[:,j,i]]))
 						file.write('\n')
 					oddRow = not oddRow

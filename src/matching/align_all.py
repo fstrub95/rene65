@@ -17,8 +17,8 @@ if __name__ == "__main__":
 
     parser = argparse.ArgumentParser('Image align input!')
 
-    parser.add_argument("-seg_ref_path", type=str, required=True, help="Path to the segmented image")
-    parser.add_argument("-grain_ref_path", type=str, required=True, help="Path to the grain image")
+    parser.add_argument("-seg_dir", type=str, required=True, help="Path to the segmented directory")
+    parser.add_argument("-grain_dir", type=str, required=True, help="Path to the grain grain_dir")
 
     parser.add_argument("-out_dir", type=str, required=True, help="Directory to output segment.align")
     parser.add_argument("-tmp_dir", type=str, required=True, help="Directory to store intermediate results")
@@ -57,9 +57,6 @@ if __name__ == "__main__":
         grain_file = os.path.join(args.grain_dir, grain_filename)
         grain = Sample(grain_file).get_image()
         grain = np.invert(grain)  # we need the background to be black (default color for numpy transformation)
-
-        grain[grain < 128] = 1
-        grain[grain >= 128] = 255
 
         # Load segment file
         segment_file = os.path.join(args.seg_dir, segment_filename)

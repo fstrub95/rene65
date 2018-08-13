@@ -5,13 +5,13 @@ from matching import matching_tools as mt
 from sample import Sample
 import numpy as np
 
-no_points = 25
+no_points_step = 75
 std_pixels = 7
 max_sampling = 2500
 polynom = 3
 
 
-seg_ref_path_train = "../../data/AM718/segment.align.718.train.png"
+seg_ref_path_train = "../../data/AM718/segment.align.train.png"
 seg_ref_path_eval = "../../data/AM718/segment.align.718.eval.png"
 grain_ref_path = "../../data/AM718/AM718_speckle_straight.tif"
 
@@ -21,19 +21,19 @@ args = argparse.Namespace(
     out_dir="../../data/AM718/tmp",
     tmp_dir="../../data/AM718/tmp",
 
-    no_points=no_points,
-    no_points_step=None,
+    no_points=None,
+    no_points_step=no_points_step,
     std_pixels=std_pixels,
     max_sampling=max_sampling,
     polynom=polynom,
+
+    invert_grain=True,
 )
 
 
 score, train_distord_segment, transformation = distord.__main__(args)
 
 ### EVAL
-
-
 train_align_segment = Sample(seg_ref_path_train).get_image()
 eval_align_segment = Sample(seg_ref_path_eval).get_image()
 
@@ -49,18 +49,13 @@ eval_distord_segment = mt.apply_distortion(segment=eval_align_segment,
                                     points=transformation,
                                     segment_path_out="../../data/AM718/eval.generalization.png")
 
+train_ratio_segment = mt.compute_score(segment=train_distord_segment, grain=grain)
+eval_ratio_segment = mt.compute_score(segment=eval_distord_segment, grain=grain)
 
+print("Computed score : ", score)
+print("Train score: ", train_ratio_segment)
+print("Eval score: ", eval_ratio_segment)
 
-train_ratio_grain = mt.compute_score(segment=train_distord_segment, grain=grain)
-eval_ratio_grain = mt.compute_score(segment=eval_distord_segment, grain=grain)
-assert(score == train_ratio_grain)
-
-
-train_ratio_segment = mt.compute_score(segment=grain, grain=train_distord_segment)
-eval_ratio_segment = mt.compute_score(segment=grain, grain=eval_distord_segment)
-
-print(train_ratio_grain, eval_ratio_grain)
-print(train_ratio_segment, eval_ratio_segment)
 
 # Plot how grain/segment overlap
 from matplotlib import pyplot as plt, cm

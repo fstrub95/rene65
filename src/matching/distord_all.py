@@ -37,11 +37,11 @@ if __name__ == "__main__":
     for segment_filename, grain_filename, ang_filename in zip(os.listdir(args.seg_dir), os.listdir(args.grain_dir), os.listdir(args.ang_dir)):
 
         id_segment = int(re.findall(r'\d+', segment_filename)[0])
-        id_grain = int(re.findall(r'\d+', segment_filename)[0])
-        id_ang = int(re.findall(r'R65_09_13_17_(\d+)_Mod.ang', ang_filename)[0])
+        # id_grain = int(re.findall(r'\d+', grain_filename)[0])
+        # id_ang = int(re.findall(r'R65_09_13_17_(\d+)_Mod.ang', ang_filename)[0])
 
-        assert id_ang == id_grain, "Mismatch between file's id : {} vs {}".format(segment_filename, id_grain)
-        assert id_ang == id_segment, "Mismatch between file's id : {} vs {}".format(segment_filename, ang_filename)
+        # assert id_ang == id_grain, "Mismatch between file's id : {} vs {}".format(segment_filename, id_grain)
+        # assert id_ang == id_segment, "Mismatch between file's id : {} vs {}".format(segment_filename, ang_filename)
 
         # Distord the grain
         output_distord = '{tmp_dir}/segment_distord.buf.png'.format(tmp_dir=args.tmp_dir)

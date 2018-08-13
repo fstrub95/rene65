@@ -5,89 +5,114 @@ import cv2
 import numpy as np
 import io
 
+import skimage
+import uuid
+
 from skimage.transform import PolynomialTransform
 
 from sklearn.preprocessing import PolynomialFeatures
 from sklearn.linear_model import LinearRegression
 from sklearn.pipeline import Pipeline
 
-def compute_score(segment, grain, normalization=None):
+def compute_score(segment, grain):
 
-    score = (grain == segment).sum()
+    segmented_grain = grain >= 128
+    segmented_segment = segment >= 128
 
-    if normalization is None:
-        normalization = (grain == 255).sum()
+    co_segmented = (segmented_grain & segmented_segment).sum()
+    normalization = segmented_segment.sum() + segmented_grain.sum()
 
-    return score/normalization
+    score = 2 * co_segmented / normalization
 
-import skimage
-import uuid
+    return score
+
 
 # create a uuid for the current session to generate tmp png files. (nasty hack!)
 tmp_uiid = uuid.uuid1()
 
+
 # Create fitness function
-def apply_distortion(segment, points, polynom, segment_path_out=None, use_image_magick=True,
-                     verbose=False):
+def apply_distortion(segment, ebsd, points, polynom, segment_path_out=None, verbose=False):
 
-    if use_image_magick:
 
-        # turn the point into string
-        str_buffer = io.BytesIO()
-        np.savetxt(str_buffer, points, fmt='%i')
+    # turn the point into string
+    str_buffer = io.BytesIO()
+    np.savetxt(str_buffer, points, fmt='%i')
 
-        # define in/out path
-        in_segment = "/tmp/segment.align.{}.png".format(tmp_uiid)
-        out_segment = "/tmp/segment.distord.{}.png".format(tmp_uiid)
+    # define in/out path
+    in_segment = "/tmp/segment.align.{}.png".format(tmp_uiid)
+    out_segment = "/tmp/segment.distord.{}.png".format(tmp_uiid)
 
-        # save tmp image
-        cv2.imwrite(in_segment, segment)
+    # save tmp image
+    cv2.imwrite(in_segment, segment)
 
-        if verbose:
-            verbose_str='-verbose'
-        else:
-            verbose_str = ''
-
-        # execute imagemagick to perform the polynomial transformation
-        subprocess.run('convert {input_segment} {verbose} -virtual-pixel gray '
-                       '-distort polynomial "{polynom} {points}" '
-                       '{output_distord}'
-                       .format(input_segment=in_segment,
-                               output_distord=out_segment,
-                               points=str_buffer.getvalue(),
-                               polynom=polynom,
-                               verbose=verbose_str), shell=True)
-
-        segment_distord = Sample(out_segment).get_image()
-
+    if verbose:
+        verbose_str = '-verbose'
     else:
+        verbose_str = ''
 
-        # Define the polynomial regression
-        model_x = Pipeline([('poly', PolynomialFeatures(degree=polynom)),
-                          ('linear', LinearRegression(fit_intercept=False))])
+    subprocess.run('convert {input_segment} {verbose} -virtual-pixel Black '
+                   '-distort Polynomial "{polynom} {points}" '
+                   '{output_distord}'
+                   .format(input_segment=in_segment,
+                           output_distord=out_segment,
+                           points=str_buffer.getvalue(),
+                           polynom=polynom,
+                           verbose=verbose_str), shell=True)
 
-        model_y = Pipeline([('poly', PolynomialFeatures(degree=polynom)),
-                          ('linear', LinearRegression(fit_intercept=False))])
+    segment_distord = Sample(out_segment).get_image()
 
-        # Solve the regression system
-        model_x.fit(points[:, :2], points[:, 2])
-        model_y.fit(points[:, :2], points[:, 3])
-
-        # Define the image transformation
-        params = np.stack([model_x.named_steps['linear'].coef_, model_y.named_steps['linear'].coef_], axis=0)
-        transform = skimage.transform._geometric.PolynomialTransform(params)
-
-        # Distord te image
-        segment_distord = skimage.transform.warp(segment, transform, order=polynom, preserve_range=True)
-
-    # force segment to be either 0 or 255
-    segment_distord[segment_distord < 128] = 0
-    segment_distord[segment_distord >= 128] = 255
+    # # Define the polynomial regression
+    # model_i = Pipeline([('poly', PolynomialFeatures(degree=polynom, include_bias=True)),
+    #                     ('linear', LinearRegression(fit_intercept=False, normalize=False))])
+    #
+    # model_j = Pipeline([('poly', PolynomialFeatures(degree=polynom, include_bias=True)),
+    #                     ('linear', LinearRegression(fit_intercept=False, normalize=False))])
+    #
+    # def swap_cols(arr, frm, to):
+    #     arr[:, [frm, to]] = arr[:, [to, frm]]
+    #
+    # sources, targets = points[:, :2], points[:, 2:]
+    # swap_cols(sources, 1, 0)
+    # swap_cols(targets, 1, 0)
+    #
+    # sources = sources.astype(np.float32)
+    # sources[:, 0] = 2.*sources[:, 0] / segment.shape[0] - 1.
+    # sources[:, 1] = 2.*sources[:, 1] / segment.shape[1] - 1.
+    #
+    # targets = targets.astype(np.float32)
+    # targets[:, 0] = 2.*targets[:, 0] / segment.shape[0] - 1.
+    # targets[:, 1] = 2.*targets[:, 1] / segment.shape[1] - 1.
+    #
+    # # Solve the regression system
+    # model_i.fit(sources, targets[:, 0])
+    # model_j.fit(sources, targets[:, 1])
+    #
+    #
+    # # Define the image transformation
+    # params = np.stack([model_i.named_steps['linear'].coef_, model_j.named_steps['linear'].coef_], axis=0)
+    # transform = skimage.transform._geometric.PolynomialTransform(params)
+    #
+    # # Distord te image
+    # segment_distord2 = skimage.transform.warp(segment, transform,
+    #                                           cval=255 / 2,
+    #                                           order=polynom,
+    #                                           preserve_range=True)
+    #
+    # print("img_magick:  {0:.6f} \t sklearn: {1:.6f} ".format(
+    #     compute_score(ebsd, segment_distord1),
+    #     compute_score(ebsd, segment_distord2)))
+    #
+    #
+    # # force segment to be either 0 or 255
+    # # segment_distord[segment_distord < 128] = 0
+    # # segment_distord[segment_distord >= 128] = 255
 
     if segment_path_out is not None:
         cv2.imwrite(segment_path_out, img=segment_distord)
 
     return segment_distord
+
 
 
 class Aligner(object):
@@ -138,14 +163,9 @@ class Aligner(object):
         return segment
 
     @staticmethod
-    def __postprocess__(segment, grain, normalization_score=None):
+    def __postprocess__(segment, grain):
 
-        segment[segment < 128] = 0
-        segment[segment >= 128] = 255
-
-        score = compute_score(segment=segment,
-                              grain=grain,
-                              normalization=normalization_score)
+        score = compute_score(segment=segment, grain=grain)
 
         return segment, score
 
@@ -155,19 +175,6 @@ class Aligner(object):
         segment = self.__rescale__(segment=segment, rescale=self.rescale)
         segment = self.__translate__(segment=segment, tx=tx, ty=ty, shape=grain.shape[::-1])
 
-        segment, score = self.__postprocess__(segment,
-                                              grain,
-                                              normalization_score=self.normalization_score)
+        segment, score = self.__postprocess__(segment, grain)
 
         return segment, score
-
-
-
-
-
-
-
-
-
-
-
