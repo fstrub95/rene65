@@ -5,7 +5,7 @@ from sample import Sample
 
 from argparse import Namespace
 
-from matching import distord
+from matching import distord_segment
 
 from matching import matching_tools as mt
 
@@ -34,7 +34,7 @@ scores, mesh, segments = [], [], []
 for _ in range(x_time):
 
     # Compute distord segment
-    _, segment, transformation = distord.__main__(args)
+    _, segment, transformation = distord_segment.__main__(args)
     segments.append(segment)
 
     # Load grain
@@ -49,7 +49,7 @@ for _ in range(x_time):
     grain = grain[x_to_crop:, :]
 
     # compute score after cropping useless parts of grain/segment
-    score = mt.compute_score(segment=segment, grain=grain)
+    score = mt.compute_score(segment=segment, ebsd=grain)
     scores.append(score)
 
     mesh.append(transformation)

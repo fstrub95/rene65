@@ -14,13 +14,13 @@ from sklearn.preprocessing import PolynomialFeatures
 from sklearn.linear_model import LinearRegression
 from sklearn.pipeline import Pipeline
 
-def compute_score(segment, grain):
+def compute_score(segment, ebsd):
 
-    segmented_grain = grain >= 128
+    segmented_ebsd = ebsd >= 128
     segmented_segment = segment >= 128
 
-    co_segmented = (segmented_grain & segmented_segment).sum()
-    normalization = segmented_segment.sum() + segmented_grain.sum()
+    co_segmented = (segmented_ebsd & segmented_segment).sum()
+    normalization = segmented_segment.sum() + segmented_ebsd.sum()
 
     score = 2 * co_segmented / normalization
 
@@ -29,6 +29,80 @@ def compute_score(segment, grain):
 
 # create a uuid for the current session to generate tmp png files. (nasty hack!)
 tmp_uiid = uuid.uuid1()
+
+
+
+
+# Create fitness function
+def apply_distortion_ebsd(segment, ebsd, points, polynom, ebsd_path_out=None, verbose=False, use_img_magic=False):
+
+    # turn the point into string
+    str_buffer = io.BytesIO()
+    np.savetxt(str_buffer, points, fmt='%i')
+
+    # define in/out path
+    in_ebsd = "/tmp/ebsd.align.{}.png".format(tmp_uiid)
+    out_ebsd = "/tmp/ebsd.distord.{}.png".format(tmp_uiid)
+
+    if use_img_magic:
+
+        # save tmp image
+        cv2.imwrite(in_ebsd, ebsd)
+
+        if verbose:
+            verbose_str = '-verbose'
+        else:
+            verbose_str = ''
+
+        subprocess.run('convert {input_ebsd} {verbose} -virtual-pixel Black '
+                       '-distort Polynomial "{polynom} {points}" '
+                       '{output_distord}'
+                       .format(input_ebsd=in_ebsd,
+                               output_distord=out_ebsd,
+                               points=str_buffer.getvalue(),
+                               polynom=polynom,
+                               verbose=verbose_str), shell=True)
+
+        ebsd_distord = Sample(out_ebsd).get_image()
+        params = None
+
+    else:
+
+        # Define the polynomial regression
+        model_i = Pipeline([('poly', PolynomialFeatures(degree=polynom, include_bias=True)),
+                            ('linear', LinearRegression(fit_intercept=False, normalize=False))])
+
+        model_j = Pipeline([('poly', PolynomialFeatures(degree=polynom, include_bias=True)),
+                            ('linear', LinearRegression(fit_intercept=False, normalize=False))])
+
+        # Solve the regression system
+        sources, targets = points[:, :2], points[:, 2:]
+
+        model_i.fit(sources, targets[:, 0])
+        model_j.fit(sources, targets[:, 1])
+
+        # Define the image transformation
+        params = np.stack([model_i.named_steps['linear'].coef_,
+                           model_j.named_steps['linear'].coef_], axis=0)
+
+        # Distord image
+        transform = skimage.transform._geometric.PolynomialTransform(params)
+        ebsd_distord = skimage.transform.warp(ebsd, transform,
+                                              cval=0,
+                                              order=0,  # k-neighbour
+                                              preserve_range=True)
+
+    if ebsd_path_out is not None:
+        cv2.imwrite(ebsd_path_out, img=ebsd_distord)
+
+    return ebsd_distord, params
+
+
+
+
+
+
+
 
 
 # Create fitness function
@@ -64,10 +138,10 @@ def apply_distortion(segment, ebsd, points, polynom, segment_path_out=None, verb
 
     # # Define the polynomial regression
     # model_i = Pipeline([('poly', PolynomialFeatures(degree=polynom, include_bias=True)),
-    #                     ('linear', LinearRegression(fit_intercept=False, normalize=False))])
+    #                     ('linear', LinearRegression(fit_intercept=True))])
     #
     # model_j = Pipeline([('poly', PolynomialFeatures(degree=polynom, include_bias=True)),
-    #                     ('linear', LinearRegression(fit_intercept=False, normalize=False))])
+    #                     ('linear', LinearRegression(fit_intercept=True))])
     #
     # def swap_cols(arr, frm, to):
     #     arr[:, [frm, to]] = arr[:, [to, frm]]
@@ -75,20 +149,20 @@ def apply_distortion(segment, ebsd, points, polynom, segment_path_out=None, verb
     # sources, targets = points[:, :2], points[:, 2:]
     # swap_cols(sources, 1, 0)
     # swap_cols(targets, 1, 0)
-    #
-    # sources = sources.astype(np.float32)
-    # sources[:, 0] = 2.*sources[:, 0] / segment.shape[0] - 1.
-    # sources[:, 1] = 2.*sources[:, 1] / segment.shape[1] - 1.
-    #
-    # targets = targets.astype(np.float32)
-    # targets[:, 0] = 2.*targets[:, 0] / segment.shape[0] - 1.
-    # targets[:, 1] = 2.*targets[:, 1] / segment.shape[1] - 1.
-    #
+    # #
+    # # sources = sources.astype(np.float32)
+    # # sources[:, 0] = 2.*sources[:, 0] / segment.shape[0] - 1.
+    # # sources[:, 1] = 2.*sources[:, 1] / segment.shape[1] - 1.
+    # #
+    # # targets = targets.astype(np.float32)
+    # # targets[:, 0] = 2.*targets[:, 0] / segment.shape[0] - 1.
+    # # targets[:, 1] = 2.*targets[:, 1] / segment.shape[1] - 1.
+    # #
     # # Solve the regression system
     # model_i.fit(sources, targets[:, 0])
     # model_j.fit(sources, targets[:, 1])
-    #
-    #
+    # #
+    # #
     # # Define the image transformation
     # params = np.stack([model_i.named_steps['linear'].coef_, model_j.named_steps['linear'].coef_], axis=0)
     # transform = skimage.transform._geometric.PolynomialTransform(params)
@@ -102,11 +176,8 @@ def apply_distortion(segment, ebsd, points, polynom, segment_path_out=None, verb
     # print("img_magick:  {0:.6f} \t sklearn: {1:.6f} ".format(
     #     compute_score(ebsd, segment_distord1),
     #     compute_score(ebsd, segment_distord2)))
-    #
-    #
-    # # force segment to be either 0 or 255
-    # # segment_distord[segment_distord < 128] = 0
-    # # segment_distord[segment_distord >= 128] = 255
+
+
 
     if segment_path_out is not None:
         cv2.imwrite(segment_path_out, img=segment_distord)
@@ -165,7 +236,7 @@ class Aligner(object):
     @staticmethod
     def __postprocess__(segment, grain):
 
-        score = compute_score(segment=segment, grain=grain)
+        score = compute_score(segment=segment, ebsd=grain)
 
         return segment, score
 

@@ -75,7 +75,7 @@ if __name__ == "__main__":
             tx=tx, ty=ty,
             angle=angle)
 
-        score = mt.compute_score(segment=align_segment, grain=grain)
+        score = mt.compute_score(segment=align_segment, ebsd=grain)
         print("score after alignment: {}".format(score))
 
     ######
@@ -93,7 +93,7 @@ if __name__ == "__main__":
                                               points=mesh,
                                               polynom=args.polynom)
 
-        score = mt.compute_score(segment=segment_distord, grain=grain)
+        score = mt.compute_score(segment=segment_distord, ebsd=grain)
         print("score after distord: {}".format(score))
 
 

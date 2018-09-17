@@ -1,8 +1,7 @@
 import numpy as np
 
 import os
-import re
-
+from distutils.util import strtobool
 from sample import Sample
 from matplotlib import pyplot as plt, cm
 import argparse
@@ -28,36 +27,31 @@ def __main__(args=None):
         parser.add_argument("-tmp_dir", type=str, required=True, help="Directory to store intermediate results")
 
         parser.add_argument("-no_points", type=float, default=None, help="Ratio of image for eachpoint of the mesh")
-        parser.add_argument("-no_points_step", type=float, default=75, help="Use an absolute step size instead of no_points")
-        parser.add_argument("-std_pixels", type=float, default=7, help="How far are going to look around the mesh ground (% of the image dimension)")
-        parser.add_argument("-max_sampling", type=int, default=1000, help="How far are going to look around the mesh ground (% of the image dimension)")
+        parser.add_argument("-no_points_step", type=float, default=50, help="Use an absolute step size instead of no_points")
+        parser.add_argument("-std_pixels", type=float, default=5, help="How far are going to look around the mesh ground (% of the image dimension)")
+        parser.add_argument("-max_sampling", type=int, default=2500, help="How far are going to look around the mesh ground (% of the image dimension)")
         parser.add_argument("-polynom", type=int, default=3, help="Order of the polynom to compute distorsion")
 
-        parser.add_argument("-invert_grain", type=bool, default=False, help="Put True if background is white")
+        parser.add_argument("-invert_ebsd", type=lambda x: bool(strtobool(x)), default="False", help="Put True if background is white")
 
         args = parser.parse_args()
 
     # check that grain and segment are the same slice
-    # id_segment = re.findall(r'\d+', os.path.basename(args.seg_ref_path))[0]
-    # id_grain = re.findall(r'\d+', os.path.basename(args.ebsd_ref_path))[0]
-    # id_slice = id_segment
     id_slice = 0
-
-    # assert id_grain == id_segment, "Mismatch between file's id : {} vs {}".format(args.seg_ref_path, args.grain_ref_path)
 
     # Load segment (need to be preprocess by align.py)
     segment = Sample(args.seg_ref_path).get_image()
 
     # Load grain
     grain = Sample(args.ebsd_ref_path).get_image()
-    if args.invert_grain:
+    if args.invert_ebsd:
         grain = np.invert(grain)  # we need the background to be black (default color for numpy transformation)
 
     # check that dimension match
     assert segment.shape == grain.shape, "Grain and shape must be of the same dimension"
 
     # compute initial score
-    init_score = mt.compute_score(segment=segment, grain=grain)
+    init_score = mt.compute_score(segment=segment, ebsd=grain)
     print("Init score : {0:.4f}".format(init_score))
 
     # Create initial mesh grid
@@ -94,7 +88,6 @@ def __main__(args=None):
 
     segment = Sample(args.seg_ref_path).get_image()
 
-
     # prepare CME
     no_samples, best_score = 0, init_score
     es = cma.CMAEvolutionStrategy(initial_points, args.std_pixels)#, {'seed': 123})
@@ -120,13 +113,7 @@ def __main__(args=None):
                                                   points=transformation,
                                                   polynom=args.polynom)
 
-            # out_image = os.path.join(args.out_dir, "yO-overlap.distord.slice{}.png".format(id_slice))
-            # fig = plt.figure(figsize=(15, 8))
-            # plt.imshow(segment_distord, interpolation='nearest', cmap=cm.gray)
-            # plt.imshow(grain, interpolation='nearest', cmap=cm.jet, alpha=0.5)
-            # fig.savefig(out_image)
-
-            score = mt.compute_score(segment=segment_distord, grain=grain)
+            score = mt.compute_score(segment=segment_distord, ebsd=grain)
             all_scores.append(score)
 
             # Make the score negative as it is a minimization process
@@ -166,13 +153,9 @@ def __main__(args=None):
                                         verbose=True)
 
     best_score = mt.compute_score(segment=final_segment,
-                                  grain=grain)
+                                  ebsd=grain)
 
     print("Final best score : {0:.4f}".format(best_score))
-
-    score = (grain == final_segment).sum() / (grain == 255).sum()
-    print("Final best old score : {0:.4f}".format(score))
-
 
     # Plot how grain/segment overlap
     fig = plt.figure(figsize=(15, 8))

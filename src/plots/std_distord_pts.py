@@ -1,4 +1,4 @@
-import matching.distord as distord
+import matching.distord_segment as distord
 
 import argparse
 from misc.pickle_helper import pickle_dump, pickle_loader
@@ -96,7 +96,7 @@ for s1 in segments:
     s = np.copy(s1)
     s[s1 < 128] = 1  # force non-grain values to have a different value than segment
     s[s1 >= 128] = 255
-    f1_distance_align_distord += [mt.compute_score(segment=segment, grain=s)]
+    f1_distance_align_distord += [mt.compute_score(segment=segment, ebsd=s)]
 
 print("f1_distance_align_distord: {} +/- {}".format(
     np.mean(f1_distance_align_distord), np.std(f1_distance_align_distord)))
@@ -108,7 +108,7 @@ for i, s1 in enumerate(segments):
             s = np.copy(s1)
             s[s1 < 128] = 1  # force non-grain values to have a different value than segment
             s[s1 >= 128] = 255
-            f1_distance += [mt.compute_score(segment=s, grain=s2)]
+            f1_distance += [mt.compute_score(segment=s, ebsd=s2)]
 
 print("f1_distance: {} +/- {}".format(np.mean(f1_distance), np.std(f1_distance)))
 

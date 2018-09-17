@@ -1,4 +1,4 @@
-import matching.distord as distord
+import matching.distord_segment as distord
 
 import argparse
 import itertools

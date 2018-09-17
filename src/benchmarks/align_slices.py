@@ -48,7 +48,7 @@ for segment_filename, grain_filename in zip(os.listdir(seg_dir), os.listdir(grai
     grain = grain[x_to_crop:, :]
 
     # compute score after cropping useless parts of grain/segment
-    score = mt.compute_score(segment=segment, grain=grain)
+    score = mt.compute_score(segment=segment, ebsd=grain)
     scores.append(score)
 
     tx.append(data["translate"][0])

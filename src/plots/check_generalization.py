@@ -1,4 +1,4 @@
-import matching.distord as distord
+import matching.distord_segment as distord
 
 import argparse
 from matching import matching_tools as mt
@@ -49,8 +49,8 @@ eval_distord_segment = mt.apply_distortion(segment=eval_align_segment,
                                     points=transformation,
                                     segment_path_out="../../data/AM718/eval.generalization.png")
 
-train_ratio_segment = mt.compute_score(segment=train_distord_segment, grain=grain)
-eval_ratio_segment = mt.compute_score(segment=eval_distord_segment, grain=grain)
+train_ratio_segment = mt.compute_score(segment=train_distord_segment, ebsd=grain)
+eval_ratio_segment = mt.compute_score(segment=eval_distord_segment, ebsd=grain)
 
 print("Computed score : ", score)
 print("Train score: ", train_ratio_segment)
