@@ -8,15 +8,14 @@ from sample import Sample
 from sklearn.metrics import jaccard_similarity_score
 import os
 
-import matching
 from matching import matching_tools as mt
 
 no_points_step = 75
 std_pixels = 5
 max_sampling = 2000
 polynom = 3
-# root = "/home/sequel/fstrub/rene65.backup/data/rene65/"
 root = "/home/fstrub/Projects/rene65.backup/data/rene65/"
+# root = "/home/fstrub/Projects/rene65.backup/data/rene65/"
 
 scores = []
 segments = []
@@ -24,6 +23,8 @@ transformations = []
 all_scores = []
 
 # for i in range(0, 100):
+#
+#     print("Start run {}".format(i))
 #
 #     out_dir = root + "tmp/{}/".format(i)
 #
@@ -52,6 +53,8 @@ all_scores = []
 #     transformations.append(t)
 #     all_scores.append(a_s)
 #
+#     print("dumping...")
+#
 #     pickle_dump(
 #         dict(scores=scores,
 #              segments=segments,
@@ -59,11 +62,15 @@ all_scores = []
 #              all_scores=all_scores),
 #         root + "std.pkl"
 #     )
+
+
 data = pickle_loader("/home/fstrub/Projects/rene65.backup/out/std.pkl")
 scores = data["scores"]
 segments = data["segments"]
 transformations = data["transformations"]
 all_scores = data["all_scores"]
+
+print(np.array(scores).shape)
 
 import seaborn as sns
 sns.set()
@@ -97,7 +104,7 @@ print("f1_distance_align_distord: {} +/- {}".format(
 f1_distance = []
 for i, s1 in enumerate(segments):
     for j, s2 in enumerate(segments):
-        if i != j:
+        if i < j:
             s = np.copy(s1)
             s[s1 < 128] = 1  # force non-grain values to have a different value than segment
             s[s1 >= 128] = 255
@@ -127,7 +134,7 @@ for i, s1 in enumerate(segments):
 print("jacard_distance: {} +/- {}".format(np.mean(jacard_distance), np.std(jacard_distance)))
 
 
-def moving_average(a, n=10) :
+def moving_average(a, n=3) :
     ret = np.cumsum(a, dtype=float)
     ret[n:] = ret[n:] - ret[:-n]
     return ret[n - 1:] / n
